@@ -308,6 +308,7 @@ class MainWindow(QMainWindow):
         self._pause_pending = False
         self._worker = None
         self._out_dir_override = ""       # boş → videonun yanında video adıyla klasör
+        self._ffmpeg_eksik = []
         self._build_player()
         self._build_ui()
         self._build_menu()
@@ -330,14 +331,32 @@ class MainWindow(QMainWindow):
         self.player.error.connect(self._on_player_error)
 
     def _check_ffmpeg(self):
-        missing = [t for t in ("ffmpeg", "ffprobe") if not shutil.which(t)]
-        if missing:
-            self.clip_btn.setEnabled(False)
-            QMessageBox.warning(
-                self, "ffmpeg eksik",
-                f"Bulunamadı: {', '.join(missing)}\n\n"
-                "Kırpma için gerekli. Kurulum:\n  sudo apt install ffmpeg"
-            )
+        """ffmpeg eksikse kırpmayı kapat ve sebebini arayüzde göster.
+
+        Burada bilerek modal bir kutu açılmıyor: bu metot kurucudan çağrılır,
+        yani pencere henüz gösterilmemişken. Gösterilmemiş bir pencereye
+        bağlanan modal diyalog diğer pencerelerin arkasında kalabilir ve
+        kullanıcı, uygulama kilitlenmiş sanır (Boxify kabuğunda araca geçerken
+        yaşanan donmanın sebebi buydu). Uyarı, kırpmaya basıldığında zaten
+        tekrar veriliyor.
+        """
+        self._ffmpeg_eksik = [t for t in ("ffmpeg", "ffprobe")
+                              if not shutil.which(t)]
+        if not self._ffmpeg_eksik:
+            return
+        self.clip_btn.setEnabled(False)
+        uyari = ("Eksik: " + ", ".join(self._ffmpeg_eksik)
+                 + " — kırpma devre dışı. " + self._ffmpeg_kurulum())
+        self.clip_btn.setToolTip(uyari)
+        self.status.showMessage(uyari)
+
+    @staticmethod
+    def _ffmpeg_kurulum() -> str:
+        if sys.platform == "darwin":
+            return "Kurulum: brew install ffmpeg"
+        if sys.platform.startswith("win"):
+            return "Kurulum: winget install ffmpeg"
+        return "Kurulum: sudo apt install ffmpeg"
 
     # ─────────────────────────────── UI build
 
@@ -1013,6 +1032,13 @@ class MainWindow(QMainWindow):
     def _do_clip(self):
         if not self._current_video or self._worker:
             return
+        # Kurucuda modal uyarı verilmiyor; eksik ffmpeg burada söyleniyor
+        if self._ffmpeg_eksik:
+            QMessageBox.warning(
+                self, "ffmpeg eksik",
+                "Bulunamadı: " + ", ".join(self._ffmpeg_eksik)
+                + "\n\nKırpma için gerekli.\n" + self._ffmpeg_kurulum())
+            return
         if self._previewing:
             QMessageBox.information(
                 self, "Önizleme modu",
@@ -1167,10 +1193,23 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.status.showMessage(f"HATA: klasör açılamadı — {e}")
 
+    def hideEvent(self, ev):
+        """Boxify kabuğunda başka bir araca geçilince oynatmayı durdur.
+
+        Sayfa gizlenmiş olsa da QMediaPlayer video çözmeye devam eder; bu,
+        arkada boşuna dönen bir video akışı demektir ve öndeki aracı
+        gözle görülür şekilde ağırlaştırır (araç değiştirince yaşanan
+        takılmanın kaynaklarından biri).
+        """
+        if self.player.state() == QMediaPlayer.PlayingState:
+            self.player.pause()
+        super().hideEvent(ev)
+
     def closeEvent(self, ev):
         if self._worker:
             self._worker.cancel()
             self._worker.wait(3000)
+        self.player.stop()
         super().closeEvent(ev)
 
 

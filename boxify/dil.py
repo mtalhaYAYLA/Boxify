@@ -84,8 +84,16 @@ KALIPLAR = [(re.compile(d), k) for d, k in [
     (r"^•  (.+)$", "•  {}"),
     (r"^— (.+)$", "— {}"),
     # kenar çubuğu: "amblem + iki boşluk + araç adı" (ör. "✂  Video Kırpıcı")
-    (r"^([✂▣⚡✎☰◔⇥])  (.+)$", "{}  {}"),
+    (r"^([✂▣⚡✎☰◔⇥⚖])  (.+)$", "{}  {}"),
     (r"^sürüm (.+)$", "version {}"),
+    # Model Karşılaştır: yuva adı ipucu ve sınıf/kare sayaçları
+    (r"^Panelde görünecek ad \(ör\. YOLOv8n\) — boşsa Model (.+)$",
+     "Name shown on the panel (e.g. YOLOv8n) — Model {} if empty"),
+    (r"^Tahmini işlenecek kare: ~(\d+)  \((\d+) çıkarım\)$",
+     "Estimated frames to process: ~{}  ({} inferences)"),
+    (r"^Tüm sınıflar açık \((\d+)\)$", "All classes on ({})"),
+    (r"^(\d+)/(\d+) sınıf açık: (.+)$", "{}/{} classes on: {}"),
+    (r"^Model (.+) seç$", "Choose model {}"),
     (r"^(.+) yükleniyor…$", "Loading {}…"),
     (r"^(.+) açılamadı$", "{} could not be opened"),
     (r"^(\d+) görsel$",
@@ -178,6 +186,7 @@ SOZLUK = {
     "Oto Label": "Auto Label",
     "Veri Denetçi": "Data Inspector",
     "Hata Analizi": "Error Analysis",
+    "Model Karşılaştır": "Model Comparison",
 
     # ── Araç kaydı: özetler ──
     "Videodan işe yarayan zaman aralıklarını kes":
@@ -192,6 +201,8 @@ SOZLUK = {
         "Inspect data, weed out duplicates, split without leakage",
     "Model nerede yanılıyor + sırada ne etiketlenmeli":
         "Where the model fails + what to label next",
+    "Aynı videoda 1-3 modeli ve seçilen sınıfları kıyasla":
+        "Compare 1-3 models and the selected classes on the same video",
     "Dağıtım biçimine çevir, hız ve sapmayı ölç":
         "Convert to deployment format, measure speed and drift",
 
@@ -222,6 +233,14 @@ SOZLUK = {
         "Runs the model on a labeled set and reports misses, hallucinations "
         "and confusions; the active-learning tab picks the most instructive "
         "frames to label next.",
+    "Aynı video üzerinde 1-3 YOLO modelini çalıştırır; her modelin "
+    "bir veya birden fazla sınıfını ayrı ayrı açıp kapatır, "
+    "tespitleri yan yana bindirip karşılaştırma videosu üretir; model başına "
+    "tespit sayısı, ortalama güven ve hız özetini raporlar.":
+        "Runs 1-3 YOLO models on the same video; turns one or more classes of "
+        "each model on and off individually, overlays the detections side by "
+        "side into a comparison video, and reports per-model detection count, "
+        "average confidence and speed.",
     "ONNX / TensorRT / OpenVINO'ya aktarır, ısınmalı hız ölçümü yapar "
     "(ortalama-medyan-p95), çalıştırma kapasitesini ve dönüşüm sapmasını raporlar.":
         "Exports to ONNX / TensorRT / OpenVINO, benchmarks with warm-up "
@@ -303,6 +322,25 @@ SOZLUK = {
     "o sınıfa yeni örnek eklemektir.":
         "If a low-sample class has high error, the fix is usually not "
         "tuning but adding new examples of that class.",
+    "Tüm modeller adil kıyaslansın diye kare önce ortak bir yüksekliğe "
+    "küçültülür — panel yüksekliğini değiştirmek kıyası etkiler, imgsz'i değil.":
+        "So every model is compared fairly, the frame is first downscaled to "
+        "a shared height — changing the panel height affects the comparison, "
+        "not imgsz.",
+    "Uzun videoda örnekleme fps'ini düşük tut (ör. 2-5 fps): N model × "
+    "her kare işlemek, tek modelli Oto Label'dan N kat daha yavaştır.":
+        "Keep the sampling fps low on long videos (e.g. 2-5 fps): processing "
+        "N models × every frame is N times slower than single-model Auto Label.",
+    "Rapor sekmesindeki hız rakamları kabaca fikir verir; kesin ölçüm için "
+    "Model Export'taki Hız Ölçümü'nü kullan.":
+        "The speed numbers in the Report tab are a rough guide; use Model "
+        "Export's Benchmark for a precise measurement.",
+    "Modeller ortak ayarla koşarsa kıyas adil olur; 'bu modele özel ayar' "
+    "sadece her modeli kendi en iyi ayarıyla görmek istediğinde açılmalı — "
+    "açtığında rapor bunu ayrıca not eder.":
+        "The comparison is fair when the models run with the common settings; "
+        "turn on 'settings specific to this model' only when you want to see "
+        "each model at its own best settings — the report notes it when you do.",
     "Hedef donanımda ölçüm yap: TensorRT ölçümü ancak dağıtım "
     "yapılacak GPU'da anlamlıdır, OpenVINO CPU'da öne geçer.":
         "Benchmark on the target hardware: a TensorRT measurement is only "
@@ -711,6 +749,154 @@ SOZLUK = {
     "Liste boş.": "The list is empty.",
     "Sınıflar okunamadı (çalıştırırken tekrar denenecek)":
         "Classes could not be read (will retry when running)",
+
+    # ── Araçlar arası ortak ayar etiketleri ──
+    "Güven eşiği (conf)": "Confidence threshold (conf)",
+    "Güven eşiği": "Confidence threshold",
+    "Görsel boyutu": "Image size",
+    "Tahmini işlenecek kare: — (video/aralık seçilince hesaplanır)":
+        "Estimated frames to process: — (computed once a video/range is chosen)",
+
+    # ── Video Kırpıcı ──
+    "⟵ Kaynak Videoya Dön": "⟵ Back to Source Video",
+
+    # ── Veri Denetçi ──
+    "Şüpheli (?)": "Suspicious (?)",
+    "Yakın-kopya (»)": "Near-duplicate (»)",
+    "Kopya eşiği": "Duplicate threshold",
+    "Küçük kutu eşiği": "Small-box threshold",
+
+    # ── Hata Analizi ──
+    "En kötüden iyiye": "Worst to best",
+    "Kaçırılan var (FN)": "Has misses (FN)",
+    "Sınıf karışıklığı": "Class confusion",
+    "Hatasız": "No errors",
+    "Belirsizlik bandı alt": "Uncertainty band low",
+    "Belirsizlik bandı üst": "Uncertainty band high",
+    "Boş kare önceliği": "Empty-frame priority",
+    "Eşleştirme IoU": "Matching IoU",
+    "Tarama eşiği": "Scan threshold",
+
+    # ── Model Export ──
+    "Biçim": "Format",
+    "CPU iş parçacığı": "CPU threads",
+    "Isınma": "Warm-up",
+    "Kamera başına fps": "fps per camera",
+    "Sapma için kare": "Frames for drift",
+    "Ölçüm tekrarı": "Benchmark repeats",
+
+    # ── Model Karşılaştır ──
+    "Model Karşılaştır — aynı videoda birden çok YOLO modeli":
+        "Model Comparison — multiple YOLO models on the same video",
+    "Video seç, 1-3 model ekle, sınıfları ve ayarları düzenleyip Başlat'a bas.":
+        "Choose a video, add 1-3 models, adjust the classes and settings and "
+        "press Start.",
+    "Video ve 1-3 model seçip Başlat'a bas":
+        "Choose a video and 1-3 models, then press Start",
+    "Video": "Video",
+    "karşılaştırılacak video": "video to compare",
+    "Süre / fps: —": "Duration / fps: —",
+    "Belirli bir aralık kullan (yoksa tüm video)":
+        "Use a specific range (otherwise the whole video)",
+    "Başl.": "Start",
+    "Bitiş": "End",
+    "Örnekleme (fps)": "Sampling (fps)",
+    "Videonun tamamı yerine saniyede bu kadar kare işlenir; N model × "
+    "her kare çok yavaş olacağından uzun videolarda düşük tutmak iyidir":
+        "This many frames per second are processed instead of the whole "
+        "video; keep it low on long videos since N models × every frame "
+        "gets slow fast",
+    "Panel yüksekliği (px)": "Panel height (px)",
+    "Tüm modeller aynı ölçekteki kareyi görsün diye kare önce bu "
+    "yüksekliğe küçültülür (adil kıyas için)":
+        "The frame is first downscaled to this height so every model sees "
+        "the same scale (for a fair comparison)",
+    "Tahmini işlenecek kare: —": "Estimated frames to process: —",
+    "+ Model Ekle": "+ Add Model",
+    "Karşılaştırmaya bir model daha kat (en fazla 3)":
+        "Add one more model to the comparison (3 max)",
+    "Bu modeli kaldır": "Remove this model",
+    "Sınıflar: —": "Classes: —",
+    "Ortak Çıkarım Ayarları": "Common Inference Settings",
+    "Kendine özel ayarı olmayan modeller bunları kullanır.":
+        "Models without their own settings use these.",
+    "Görsel boyutu (imgsz)": "Image size (imgsz)",
+    "Yarı hassasiyet (FP16)": "Half precision (FP16)",
+    "Sadece GPU'da işe yarar; CPU'da yok sayılır":
+        "Only helps on GPU; ignored on CPU",
+    "Sınıftan bağımsız NMS": "Class-agnostic NMS",
+    "Üst üste binen kutular sınıf farkı gözetmeden elenir":
+        "Overlapping boxes are suppressed regardless of class",
+
+    # ── Model Karşılaştır: modele özel ayarlar ve sınıf filtresi ──
+    "İşaretli sınıflar çıkarıma katılır; işareti kaldırılan sınıflar bu "
+    "model için kapatılır. Bir modelde birden fazla sınıf seçilebilir.":
+        "Checked classes take part in inference; unchecked classes are turned "
+        "off for this model. More than one class can be selected per model.",
+    "Tüm sınıflar": "All classes",
+    "Hiçbiri": "None",
+    "Model seçilince sınıflar buraya gelir":
+        "Classes appear here once a model is chosen",
+    "Model açılıyor, lütfen bekle…": "Opening the model, please wait…",
+    "Sınıflar okunuyor…": "Reading classes…",
+    "Filtre uygulanamaz — tüm sınıflar açık sayılır":
+        "No filter can be applied — all classes count as on",
+    "Hiçbir sınıf açık değil — bu model hiçbir şey tespit etmez":
+        "No class is on — this model will detect nothing",
+    "Bu modele özel çıkarım ayarı kullan":
+        "Use inference settings specific to this model",
+    "Kapalıyken ortak ayarlar geçerlidir (adil kıyas). Açmak, her modeli "
+    "kendi en iyi ayarıyla kıyaslamak istediğinde anlamlıdır; seçim "
+    "rapora da yazılır.":
+        "While off, the common settings apply (fair comparison). Turning it "
+        "on makes sense when you want to compare each model at its own best "
+        "settings; the choice is written into the report too.",
+    "Sınıf seçilmedi": "No class selected",
+    "Görünüm ve Ek Çıktılar": "Appearance and Extra Outputs",
+    "Çıktı klasörü": "Output folder",
+    "Bu modeli karşılaştırmadan çıkar": "Drop this model from the comparison",
+    "Mozaik düzeni": "Mosaic layout",
+    "Yan yana (yatay)": "Side by side (horizontal)",
+    "Alt alta (dikey)": "Stacked (vertical)",
+    "Dikey video ya da 3 model kıyaslarken alt alta daha okunaklı olur":
+        "Stacked reads better for portrait video or when comparing 3 models",
+    "Kutu üstünde sınıf adı göster": "Show class name on the box",
+    "Kutu üstünde güven değeri göster": "Show confidence on the box",
+    "Karşılaştırma videosunu yaz": "Write the comparison video",
+    "Kapatırsan sadece canlı önizleme ve rapor üretilir (daha hızlı)":
+        "Turn it off to produce only the live preview and the report (faster)",
+    "Çıktı": "Output",
+    "karşılaştırma videosunun kaydedileceği klasör":
+        "folder where the comparison video will be saved",
+    "Model başına ayrı video da kaydet": "Also save a separate video per model",
+    "karsilastirma.mp4 dışında her model için ayrı bir mp4 yazılır":
+        "Besides karsilastirma.mp4, a separate mp4 is written per model",
+    "▶ Sonucu Aç": "▶ Open Result",
+    "karsilastirma.mp4'ü sistem oynatıcısında açar":
+        "Opens karsilastirma.mp4 in the system player",
+    "Karşılaştırma Raporu": "Comparison Report",
+    "Raporu Kaydet…": "Save Report…",
+    "▶  Karşılaştırmayı Başlat": "▶  Start Comparison",
+    "Video Seç…": "Choose Video…",
+    "Video yok": "No video",
+    "Geçerli bir video seç.": "Choose a valid video.",
+    "Yetersiz model": "Not enough models",
+    "En az bir geçerli model seçmelisin.":
+        "You must choose at least one valid model.",
+    "Model eksik": "Model missing",
+    "Çıktı klasörü yok": "No output folder",
+    "Karşılaştırmanın kaydedileceği klasörü seç.":
+        "Choose the folder where the comparison will be saved.",
+    "Aralık hatalı": "Invalid range",
+    "Başlangıç/bitiş zamanı geçersiz (format dd:ss.ms).":
+        "The start/end time is invalid (format mm:ss.ms).",
+    "Karşılaştırmanın kaydedileceği klasör":
+        "Folder where the comparison will be saved",
+    "Sonuç videosu henüz yok.": "The result video doesn't exist yet.",
+    "Önce çıktı klasörü seç.": "Choose the output folder first.",
+    "Önce bir karşılaştırma çalıştır.": "Run a comparison first.",
+    "İptal isteniyor… (işlenen kare bitince duracak)":
+        "Cancelling… (will stop after the current frame)",
 
     # ── Model Export ──
     "Model Export & Hız Ölçümü": "Model Export & Benchmark",

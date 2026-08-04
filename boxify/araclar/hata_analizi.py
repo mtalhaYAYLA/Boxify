@@ -24,6 +24,7 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal, QRectF, QLineF
 from PyQt5.QtGui import QImage, QPainter, QPen, QColor, QFont
 
 from ..tema import STYLE  # ortak açık tema — bkz. boxify/tema.py
+from .model_bilgi import SinifYukleyici, sinif_ozeti
 
 IMG_EXTS = (".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff")
 
@@ -449,6 +450,7 @@ class MainWindow(QMainWindow):
         self._names = {}
         self._mode = ""
         self._worker = None
+        self._sinif_yukleyici = None
         self._build_ui()
         self._build_menu()
 
@@ -759,14 +761,38 @@ class MainWindow(QMainWindow):
         self.model_edit.setText(p)
         self.model_edit.setToolTip(p)
         self.model_edit.setCursorPosition(0)
-        try:
-            from ultralytics import YOLO
-            self._names = dict(YOLO(p).names)
-            self.model_info.setText(f"{len(self._names)} sınıf: " +
-                                    ", ".join(self._names[i] for i in sorted(self._names)))
-        except Exception as e:
+        self._load_class_names(p)
+
+    def _load_class_names(self, path: str):
+        """Sınıf adlarını arka planda oku.
+
+        `from ultralytics import YOLO` ilk çağrıda torch'u da yükler; bunu
+        arayüz iş parçacığında yapmak pencereyi saniyelerce dondurur.
+        """
+        self.model_info.setText("Sınıflar okunuyor…")
+        eski = self._sinif_yukleyici
+        if eski is not None:
+            try:
+                eski.tamamlandi.disconnect()
+            except TypeError:
+                pass
+        self._sinif_yukleyici = SinifYukleyici(path, self)
+        self._sinif_yukleyici.tamamlandi.connect(self._on_class_names)
+        self._sinif_yukleyici.start()
+
+    def _on_class_names(self, yol: str, names: dict, hata: str):
+        if self._sinif_yukleyici is not None:
+            self._sinif_yukleyici.deleteLater()
+        self._sinif_yukleyici = None
+        # Kullanıcı bu arada başka model seçtiyse geç gelen sonucu yut
+        if yol != self._model_path:
+            return
+        if hata:
             self.model_info.setText("Sınıflar okunamadı (çalıştırırken tekrar denenecek)")
-            self._log(f"Model sınıfları okunamadı: {e}")
+            self._log(f"Model sınıfları okunamadı: {hata}")
+            return
+        self._names = names
+        self.model_info.setText(sinif_ozeti(names))
 
     def _pick_eval_img(self):
         d = QFileDialog.getExistingDirectory(self, "Etiketli görsel klasörü",
@@ -1110,6 +1136,8 @@ class MainWindow(QMainWindow):
         if self._worker:
             self._worker.cancel()
             self._worker.wait(5000)
+        if self._sinif_yukleyici is not None:
+            self._sinif_yukleyici.wait(3000)
         super().closeEvent(ev)
 
 

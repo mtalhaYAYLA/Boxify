@@ -441,6 +441,23 @@ class MainWindow(QMainWindow):
         if self._last_out_dir and os.path.isdir(self._last_out_dir):
             klasoru_ac(self._last_out_dir)
 
+    def hideEvent(self, ev):
+        """Boxify kabuğunda başka bir araca geçilince oynatmayı durdur.
+
+        Sayfa gizlenmiş olsa da QMediaPlayer video çözmeye devam eder; arkada
+        boşuna dönen bir akış öndeki aracı gözle görülür şekilde ağırlaştırır.
+        """
+        if self.player.state() == QMediaPlayer.PlayingState:
+            self.player.pause()
+        super().hideEvent(ev)
+
+    def closeEvent(self, ev):
+        self.player.stop()
+        if self._worker is not None and self._worker.isRunning():
+            # ffmpeg süreci kendi başına bitmeli; sadece iş parçacığını bekle
+            self._worker.wait(3000)
+        super().closeEvent(ev)
+
 
 def main():
     app = QApplication(sys.argv)

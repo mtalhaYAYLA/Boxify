@@ -19,6 +19,7 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QImage, QPixmap
 
 from ..tema import STYLE  # ortak açık tema — bkz. boxify/tema.py
+from .model_bilgi import SinifYukleyici
 
 IMG_EXTS = (".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff")
 
@@ -272,6 +273,7 @@ class MainWindow(QMainWindow):
         self._images = []
         self._names = {}
         self._worker = None
+        self._sinif_yukleyici = None
         self._build_ui()
         self._build_menu()
 
@@ -541,13 +543,35 @@ class MainWindow(QMainWindow):
         self._load_class_names(p)
 
     def _load_class_names(self, path: str):
-        """Sınıf listesini modelden oku (filtre kutuları için)."""
-        try:
-            from ultralytics import YOLO
-            names = dict(YOLO(path).names)
-        except Exception as e:
+        """Sınıf listesini modelden oku (filtre kutuları için).
+
+        Okuma arka planda yapılır: `from ultralytics import YOLO` ilk çağrıda
+        torch'u da yükler ve bu, arayüz iş parçacığında saniyelerce süren bir
+        donma demektir.
+        """
+        self.model_info_lbl.setText("Sınıflar okunuyor…")
+        self.class_list.clear()
+        eski = getattr(self, "_sinif_yukleyici", None)
+        if eski is not None:
+            try:
+                eski.tamamlandi.disconnect()
+            except TypeError:
+                pass
+        self._sinif_yukleyici = SinifYukleyici(path, self)
+        self._sinif_yukleyici.tamamlandi.connect(self._on_class_names)
+        self._sinif_yukleyici.start()
+
+    def _on_class_names(self, yol: str, names: dict, hata: str):
+        yukleyici = getattr(self, "_sinif_yukleyici", None)
+        if yukleyici is not None:
+            yukleyici.deleteLater()
+        self._sinif_yukleyici = None
+        # Kullanıcı bu arada başka model seçtiyse geç gelen sonucu yut
+        if yol != self._model_path:
+            return
+        if hata:
             self.model_info_lbl.setText("Sınıflar okunamadı (Başlat'ta tekrar denenecek)")
-            self._log(f"Model sınıfları okunamadı: {e}")
+            self._log(f"Model sınıfları okunamadı: {hata}")
             return
         self._set_names(names)
 
@@ -760,6 +784,8 @@ class MainWindow(QMainWindow):
         if self._worker:
             self._worker.cancel()
             self._worker.wait(5000)
+        if self._sinif_yukleyici is not None:
+            self._sinif_yukleyici.wait(3000)
         super().closeEvent(ev)
 
 

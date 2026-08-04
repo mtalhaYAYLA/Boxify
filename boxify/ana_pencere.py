@@ -13,8 +13,9 @@ import traceback
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
     QStackedWidget, QFrame, QMessageBox, QApplication, QButtonGroup,
+    QScrollArea,
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QPixmap
 
 from . import SURUM
@@ -22,6 +23,23 @@ from .araclar import ARACLAR, arac_bul
 from .dil import tr, aktif_dil, dil_kaydet
 from .sayfalar.anasayfa import AnaSayfa, IKON_YOLU
 from .sayfalar.ipuclari import IpuclariSayfasi
+
+
+class ModulYukleyici(QThread):
+    """Ağır araç importlarını arayüz olay döngüsünü durdurmadan yapar."""
+    tamamlandi = pyqtSignal(dict, object, str)
+
+    def __init__(self, arac: dict, parent=None):
+        super().__init__(parent)
+        self.arac = arac
+
+    def run(self):
+        try:
+            modul = importlib.import_module(self.arac["modul"])
+            self.tamamlandi.emit(self.arac, modul, "")
+        except Exception:
+            self.tamamlandi.emit(
+                self.arac, None, traceback.format_exc(limit=6))
 
 
 class AnaPencere(QMainWindow):
@@ -32,7 +50,11 @@ class AnaPencere(QMainWindow):
         self.resize(1500, 920)
 
         self._sayfa_no = {}      # anahtar -> stack indeksi
+        self._arac_sayfalari = {}  # anahtar -> aracın MainWindow'u
         self._nav_dugmeler = {}  # anahtar -> QPushButton
+        self._modul_yukleyici = None
+        self._istenen_arac = None
+        self._kapaniyor = False
 
         kok = QWidget()
         yatay = QHBoxLayout(kok)
@@ -186,6 +208,7 @@ class AnaPencere(QMainWindow):
     def arac_ac(self, anahtar: str):
         """Sayfayı göster; araçsa ilk istekte modülünü yükleyip yığına ekle."""
         if anahtar in self._sabit_sayfa:
+            self._istenen_arac = None
             self.yigin.setCurrentIndex(self._sabit_sayfa[anahtar])
             self._nav_dugmeler[anahtar].setChecked(True)
             self.statusBar().showMessage(
@@ -195,43 +218,95 @@ class AnaPencere(QMainWindow):
 
         arac = arac_bul(anahtar)
         if anahtar not in self._sayfa_no:
-            if not self._arac_yukle(arac):
-                # Yükleme başarısız: ana sayfada kal
-                self._nav_dugmeler["anasayfa"].setChecked(True)
-                self.yigin.setCurrentIndex(0)
-                return
+            self._istenen_arac = anahtar
+            if self._modul_yukleyici is None:
+                self._arac_yukle(arac)
+            else:
+                self.statusBar().showMessage(
+                    f'{arac["ad"]} sıraya alındı; mevcut araç yükleniyor…')
+            return
 
         self.yigin.setCurrentIndex(self._sayfa_no[anahtar])
+        self._istenen_arac = anahtar
         self._nav_dugmeler[anahtar].setChecked(True)
         self.statusBar().showMessage(tr(arac["ad"]) + " — " + tr(arac["ozet"]))
 
-    def _arac_yukle(self, arac: dict) -> bool:
+    def _arac_yukle(self, arac: dict):
+        """Modülü arka planda yükle; QWidget'i ana iş parçacığında oluştur."""
         QApplication.setOverrideCursor(Qt.WaitCursor)
         self.statusBar().showMessage(f'{arac["ad"]} yükleniyor…')
         QApplication.processEvents()
-        try:
-            modul = importlib.import_module(arac["modul"])
-            pencere = modul.MainWindow()
-            pencere.setWindowFlags(Qt.Widget)   # gömülü kullanım
-        except Exception:
-            QApplication.restoreOverrideCursor()
+        self._modul_yukleyici = ModulYukleyici(arac, self)
+        self._modul_yukleyici.tamamlandi.connect(self._arac_yuklendi)
+        self._modul_yukleyici.start()
+
+    def _arac_yuklendi(self, arac: dict, modul, hata: str):
+        yukleyici = self._modul_yukleyici
+        self._modul_yukleyici = None
+        QApplication.restoreOverrideCursor()
+
+        # Pencere kapanırken gelen geç sinyal yıkılmış widget'lara dokunmasın
+        if self._kapaniyor:
+            if yukleyici is not None:
+                yukleyici.deleteLater()
+            return
+
+        if hata:
             QMessageBox.critical(
                 self, f'{arac["ad"]} açılamadı',
                 tr("Araç yüklenirken hata oluştu (eksik bağımlılık olabilir):")
-                + "\n\n" + traceback.format_exc(limit=6))
-            return False
-        QApplication.restoreOverrideCursor()
+                + "\n\n" + hata)
+        else:
+            try:
+                pencere = modul.MainWindow()
+                pencere.setWindowFlags(Qt.Widget)
+                # Araçlar tek başına çalışırken kendilerine geniş bir alt sınır
+                # koyar (ör. 1360x840); üstüne bir de iç düzenlerinin kendi
+                # minimumu var. Yığına doğrudan gömülünce bu alt sınır
+                # QStackedWidget üzerinden ana pencereye taşınır: her yeni araç
+                # yüklendiğinde pencere zorla büyür ve geçişler takılır.
+                # Kaydırma alanına sarmak zinciri koparır — pencere küçük
+                # kalabilir, sığmayan araç kendi içinde kaydırılır.
+                pencere.setMinimumSize(0, 0)
+                kutu = QScrollArea()
+                kutu.setWidgetResizable(True)
+                kutu.setFrameShape(QFrame.NoFrame)
+                kutu.setWidget(pencere)
+                indeks = self.yigin.addWidget(kutu)
+                self._sayfa_no[arac["anahtar"]] = indeks
+                self._arac_sayfalari[arac["anahtar"]] = pencere
+            except Exception:
+                QMessageBox.critical(
+                    self, f'{arac["ad"]} açılamadı',
+                    tr("Araç arayüzü oluşturulurken hata oluştu:")
+                    + "\n\n" + traceback.format_exc(limit=6))
 
-        indeks = self.yigin.addWidget(pencere)
-        self._sayfa_no[arac["anahtar"]] = indeks
-        return True
+        if yukleyici is not None:
+            yukleyici.deleteLater()
+
+        istenen = self._istenen_arac
+        if istenen in self._sayfa_no:
+            hedef = arac_bul(istenen)
+            self.yigin.setCurrentIndex(self._sayfa_no[istenen])
+            self._nav_dugmeler[istenen].setChecked(True)
+            self.statusBar().showMessage(tr(hedef["ad"]) + " — " + tr(hedef["ozet"]))
+        elif istenen and istenen != arac["anahtar"]:
+            self._arac_yukle(arac_bul(istenen))
+        else:
+            self._nav_dugmeler["anasayfa"].setChecked(True)
+            self.yigin.setCurrentIndex(0)
 
     # ── Kapanış ──────────────────────────────────────────────────────────
     def closeEvent(self, olay):
         """Açık araçların kendi kapanış onayları varsa onlara sor."""
-        for indeks in self._sayfa_no.values():
-            sayfa = self.yigin.widget(indeks)
+        # Yığındaki widget kaydırma kutusudur; onay aracın kendisine sorulmalı
+        for sayfa in self._arac_sayfalari.values():
             if sayfa is not None and not sayfa.close():
                 olay.ignore()
                 return
+        # Onaylar geçildi: artık kapanıyoruz — yükleyiciyi burada bekle ki
+        # araç "vazgeç" derse yarım kalan import boşuna beklenmesin
+        self._kapaniyor = True
+        if self._modul_yukleyici is not None:
+            self._modul_yukleyici.wait(5000)
         olay.accept()

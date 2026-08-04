@@ -112,6 +112,28 @@ ARACLAR = [
         ],
     },
     {
+        "anahtar": "model_karsilastir",
+        "ad": "Model Karşılaştır",
+        "amblem": "⚖",
+        "modul": "boxify.araclar.model_karsilastir",
+        "ozet": "Aynı videoda 1-3 modeli ve seçilen sınıfları kıyasla",
+        "aciklama": "Aynı video üzerinde 1-3 YOLO modelini çalıştırır; her modelin "
+                    "bir veya birden fazla sınıfını ayrı ayrı açıp kapatır, "
+                    "tespitleri yan yana bindirip karşılaştırma videosu üretir; model başına "
+                    "tespit sayısı, ortalama güven ve hız özetini raporlar.",
+        "ipuclari": [
+            "Tüm modeller adil kıyaslansın diye kare önce ortak bir yüksekliğe "
+            "küçültülür — panel yüksekliğini değiştirmek kıyası etkiler, imgsz'i değil.",
+            "Uzun videoda örnekleme fps'ini düşük tut (ör. 2-5 fps): N model × "
+            "her kare işlemek, tek modelli Oto Label'dan N kat daha yavaştır.",
+            "Rapor sekmesindeki hız rakamları kabaca fikir verir; kesin ölçüm için "
+            "Model Export'taki Hız Ölçümü'nü kullan.",
+            "Modeller ortak ayarla koşarsa kıyas adil olur; 'bu modele özel ayar' "
+            "sadece her modeli kendi en iyi ayarıyla görmek istediğinde açılmalı — "
+            "açtığında rapor bunu ayrıca not eder.",
+        ],
+    },
+    {
         "anahtar": "model_export",
         "ad": "Model Export",
         "amblem": "⇥",
