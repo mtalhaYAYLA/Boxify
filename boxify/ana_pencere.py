@@ -259,19 +259,32 @@ class AnaPencere(QMainWindow):
         else:
             try:
                 pencere = modul.MainWindow()
-                pencere.setWindowFlags(Qt.Widget)
-                # Araçlar tek başına çalışırken kendilerine geniş bir alt sınır
-                # koyar (ör. 1360x840); üstüne bir de iç düzenlerinin kendi
-                # minimumu var. Yığına doğrudan gömülünce bu alt sınır
-                # QStackedWidget üzerinden ana pencereye taşınır: her yeni araç
-                # yüklendiğinde pencere zorla büyür ve geçişler takılır.
-                # Kaydırma alanına sarmak zinciri koparır — pencere küçük
-                # kalabilir, sığmayan araç kendi içinde kaydırılır.
-                pencere.setMinimumSize(0, 0)
+
                 kutu = QScrollArea()
                 kutu.setWidgetResizable(True)
                 kutu.setFrameShape(QFrame.NoFrame)
+
+                # SIRA ÖNEMLİ: önce ebeveyn, sonra pencere bayrağı.
+                # Araç kendi modülünde üst düzey bir QMainWindow olarak
+                # doğuyor ve macOS'ta buna yerel bir pencere atanıyor.
+                # setWindowFlags(Qt.Widget) widget hâlâ üst düzeyken
+                # çağrılırsa o yerel pencere ayakta kalıyor; gömüldükten
+                # sonra da konumunu kendi eski (çoğu zaman ikinci monitöre
+                # düşen) koordinatlarından bildiriyor. Sonuç: araç doğru
+                # yerde ÇİZİLİYOR ama fare isabeti yüzlerce piksel ötede
+                # aranıyor, yani araç içindeki düğmeler tıklanamıyor.
+                # Önce reparent edilince üst düzeylik bozuluyor ve bayrağı
+                # temizlemek artık geometriyi etkilemiyor.
                 kutu.setWidget(pencere)
+                pencere.setWindowFlags(Qt.Widget)
+
+                # Araçlar tek başına çalışırken kendilerine geniş bir alt sınır
+                # koyar (ör. 1360x840); üstüne bir de iç düzenlerinin kendi
+                # minimumu var. Bu alt sınır QStackedWidget üzerinden ana
+                # pencereye taşınırsa her yeni araçta pencere zorla büyür ve
+                # geçişler takılır. Kaydırma alanı zinciri koparıyor —
+                # pencere küçük kalabilir, sığmayan araç kendi içinde kayar.
+                pencere.setMinimumSize(0, 0)
                 indeks = self.yigin.addWidget(kutu)
                 self._sayfa_no[arac["anahtar"]] = indeks
                 self._arac_sayfalari[arac["anahtar"]] = pencere

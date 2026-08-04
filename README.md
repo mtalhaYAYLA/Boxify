@@ -150,6 +150,11 @@ git checkout main        # güncele dön
 - **Araç geçişlerindeki donmalar giderildi** — üç ayrı kaynak vardı: ana iş parçacığında yapılan
   `YOLO()` çağrısı, gömülü sayfaların ana pencereye taşan alt boyut sınırı ve kurucu içinde
   açılan modal diyalog. Ayrıntı: [Teknik notlar](#teknik-notlar).
+- **Araç içindeki düğmeler tıklanamıyordu** — araçlar kendi modüllerinde üst düzey birer
+  `QMainWindow` olarak doğuyor; macOS'ta buna yerel bir pencere atanıyor ve `setWindowFlags`
+  gömmeden *önce* çağrılırsa o pencere ayakta kalıp konumunu eski koordinatlarından bildiriyordu.
+  Araç doğru yerde çiziliyor ama fare isabeti yüzlerce piksel ötede aranıyordu (çok monitörlü
+  kurulumda çok belirgin). Artık önce reparent, sonra bayrak. Bkz. [Teknik notlar](#teknik-notlar).
 - **Sol panel erişilebilirliği** — Model Karşılaştır'da ayarlar görünür alanı aşıp en çok
   kullanılan düğmeleri kıvrımın altında bırakıyordu. Zorunlu denetimler (çıktı klasörü, Başlat,
   İptal) artık kaydırmayan bir şeritte sabit duruyor; nadir kullanılan ayar grupları katlanabilir.
@@ -339,6 +344,10 @@ tag'e geçebilirsin — bkz. [Sürüm geçmişi](#sürüm-geçmişi).
   koyar (ör. 1360×840). Yığına doğrudan gömülseler bu sınır ana pencereye taşınır ve her yeni
   araçta pencere zorla büyür. Bu yüzden her araç sayfası bir kaydırma alanına sarılır: pencere
   küçük kalabilir, sığmayan araç kendi içinde kaydırılır.
+- **Gömme sırası (fare isabeti):** Araç sayfası önce kaydırma alanına verilir, `setWindowFlags(
+  Qt.Widget)` ancak ondan sonra çağrılır. Ters sırada, araç üst düzeyken aldığı yerel pencere
+  ayakta kalır ve fare isabet testi widget'ları gerçekte çizildikleri yerde değil, o hayalet
+  pencerenin koordinatlarında arar — araç içindeki hiçbir düğmeye basılamaz.
 - **Arka planda medya:** Video Kırpıcı ve Kare Alıcı, sayfaları gizlendiğinde oynatmayı
   duraklatır — yoksa QMediaPlayer görünmeyen bir videoyu çözmeye devam eder ve öndeki aracı
   yavaşlatır.
