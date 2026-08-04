@@ -1,0 +1,11 @@
+# Boxify 2 bağımlılıkları
+# Önerilen ortam: truck_detect (hepsi zaten kurulu)
+PyQt5>=5.15
+numpy
+opencv-python
+ultralytics>=8.4          # oto-label, hata-analizi, model-export, labelapp eğitimi
+PyYAML                    # labelapp veri kümesi ve data.yaml okuma/yazma
+# İsteğe bağlı (sadece o export biçimleri için):
+#   tensorrt              # .engine üretimi (NVIDIA GPU gerekir)
+#   openvino              # OpenVINO IR üretimi
+# Sistem paketi: ffmpeg (video kırpma ve kare çıkarma için)
