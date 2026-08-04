@@ -26,13 +26,16 @@ from PyQt5.QtGui import QIcon                     # noqa: E402
 
 from boxify import SURUM                          # noqa: E402
 from boxify import dil                            # noqa: E402
+from boxify import tema                           # noqa: E402
 
-# Dil yamaları her pencereden önce kurulmalı (İngilizce modda Qt metin
-# API'leri çeviri süzgecinden geçirilir; Türkçede hiçbir şey değişmez)
+# Dil ve tema yamaları her pencereden önce kurulmalı: ikisi de Qt API'lerini
+# sarmalıyor (dil metinleri, tema stil renklerini çevirir). Varsayılan durumda
+# — Türkçe + açık tema — hiçbir yama kurulmaz, dolayısıyla maliyeti de yoktur.
 dil.dil_yukle()
 dil.yamalari_kur()
+tema.tema_yukle()
+tema.yamalari_kur()
 
-from boxify.tema import STYLE                     # noqa: E402
 from boxify.ana_pencere import AnaPencere         # noqa: E402
 
 
@@ -40,7 +43,7 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Boxify")
     app.setApplicationVersion(SURUM)
-    app.setStyleSheet(STYLE)
+    app.setStyleSheet(tema.stil())
 
     ikon = os.path.join(KOK, "ikon.png")
     if os.path.exists(ikon):

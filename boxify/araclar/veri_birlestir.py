@@ -609,7 +609,11 @@ class BirlestirDialog(QDialog):
 def main():
     from ..tema import STYLE
     app = QApplication(sys.argv)
-    app.setStyleSheet(STYLE)
+    # Tek başına çalıştırıldığında tema ayarını kabuk yüklemez; buradan okunur
+    from .. import tema as _tema
+    _tema.tema_yukle()
+    _tema.yamalari_kur()
+    app.setStyleSheet(_tema.stil())
     d = BirlestirDialog()
     d.show()
     sys.exit(app.exec_())

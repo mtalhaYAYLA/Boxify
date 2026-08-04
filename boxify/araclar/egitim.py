@@ -34,7 +34,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize
 from PyQt5.QtGui import QPainter, QColor, QPen, QFont
 
-from ..tema import STYLE
+from ..tema import STYLE, renk, koyu_mu
 from ..klasor_ac import klasoru_ac
 from .model_bilgi import cihaz_combo_doldur
 
@@ -336,15 +336,16 @@ class EgriWidget(QWidget):
         sol, sag, ust, alt = 44, 44, 14, 26
         gw, gh = max(1, w - sol - sag), max(1, h - ust - alt)
 
-        p.fillRect(self.rect(), QColor("#ffffff"))
-        p.setPen(QPen(QColor("#e3e8ee"), 1))
+        # Elle boyanan renkler stil yamalamasının dışında kalır; temadan istenir
+        p.fillRect(self.rect(), QColor(renk("#ffffff")))
+        p.setPen(QPen(QColor(renk("#e3e8ee")), 1))
         for i in range(5):
             y = ust + gh * i / 4
             p.drawLine(sol, int(y), sol + gw, int(y))
 
         f = QFont(); f.setPixelSize(10); p.setFont(f)
         if not self._veri:
-            p.setPen(QColor("#8b95a3"))
+            p.setPen(QColor(renk("#8b95a3")))
             p.drawText(self.rect(), Qt.AlignCenter,
                        "Eğitim başlayınca kayıp ve mAP eğrisi burada çizilir")
             return
@@ -358,11 +359,12 @@ class EgriWidget(QWidget):
             return sol + (gw * i / max(1, n - 1) if n > 1 else gw / 2)
 
         # eksen yazıları
-        p.setPen(QColor("#2e6da4"))
+        p.setPen(QColor(renk("#2e6da4")))
         for i in range(5):
             deger = maks_k * (1 - i / 4)
             p.drawText(2, int(ust + gh * i / 4) + 4, f"{deger:.2f}")
-        p.setPen(QColor("#8a6d00"))
+        # kehribar eksen yazısı: açık zeminde koyu, koyu zeminde açık olmalı
+        p.setPen(QColor("#c9a227" if koyu_mu() else "#8a6d00"))
         for i in range(5):
             p.drawText(sol + gw + 6, int(ust + gh * i / 4) + 4, f"{1 - i / 4:.2f}")
 
@@ -381,11 +383,11 @@ class EgriWidget(QWidget):
             for a, b in zip(noktalar, noktalar[1:]):
                 p.drawLine(int(a[0]), int(a[1]), int(b[0]), int(b[1]))
 
-        ciz("loss", "#2e6da4", False, maks_k)
+        ciz("loss", renk("#2e6da4"), False, maks_k)
         ciz("map", "#f5c518", True, 1.0)
 
         son = self._veri[-1]
-        p.setPen(QColor("#42505f"))
+        p.setPen(QColor(renk("#42505f")))
         etiket = f"epoch {son.get('epoch', n)}/{son.get('epochs', '?')}"
         if son.get("loss") is not None:
             etiket += f"   kayıp {son['loss']:.3f}"
@@ -1013,7 +1015,11 @@ class MainWindow(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
-    app.setStyleSheet(STYLE)
+    # Tek başına çalıştırıldığında tema ayarını kabuk yüklemez; buradan okunur
+    from .. import tema as _tema
+    _tema.tema_yukle()
+    _tema.yamalari_kur()
+    app.setStyleSheet(_tema.stil())
     w = MainWindow()
     w.show()
     sys.exit(app.exec_())

@@ -170,7 +170,21 @@ git checkout main        # güncele dön
 | [`v2.0.1`](../../releases/tag/v2.0.1) | Ürünleştirme: **açık beyaz-mavi tema**, İpuçları sayfası, zincir/adım numaraları kaldırıldı, metinler alan-bağımsız hâle getirildi |
 | [`v2.0.2`](../../releases/tag/v2.0.2) | **TR/EN arayüz dili**: çeviri, araç kodlarına dokunmayan bir dil eklentisiyle (`dil.py`) yapıldı |
 | [`v3.0.0`](../../releases/tag/v3.0.0) | **⚖ Model Karşılaştır** (sekizinci araç) + arayüz akıcılığı düzeltmeleri; depo tek kod tabanına düzleştirildi |
-| [`v4.0.0`](../../releases/tag/v4.0.0) | **Döngü uygulamanın içinde kapandı:** ◈ Eğitim (dokuzuncu araç) + ⇉ veri seti birleştirme/sınıf eşleme + sızıntılı bölme hatasının düzeltilmesi + platforma göre kurulum (macOS `.app`) — **güncel sürüm** |
+| [`v4.0.0`](../../releases/tag/v4.0.0) | **Döngü uygulamanın içinde kapandı:** ◈ Eğitim (dokuzuncu araç) + ⇉ veri seti birleştirme/sınıf eşleme + sızıntılı bölme hatasının düzeltilmesi + platforma göre kurulum (macOS `.app`) |
+| [`v4.1.0`](../../releases/tag/v4.1.0) | **☀/☾ Açık ve koyu tema** + platform desteğinin macOS/Linux/Windows'ta eşitlenmesi (GStreamer düzeltmesi ARM Linux'ta da çalışıyor) — **güncel sürüm** |
+
+### 4.1.0'da neler değişti
+
+- **Açık/koyu tema.** Kenar çubuğunun dibinde, dil düğmelerinin altında. Seçim dil ile aynı
+  dosyada saklanır ve dokuz aracın tamamına işler. Araç kodlarına hiç dokunulmadı; `setStyleSheet`
+  yamalanıp koyu temada renkler çevriliyor — dil desteğindeki desenin aynısı. Veri renkleri
+  (tespit kutuları, eğri renkleri) bilerek değişmiyor.
+- **Platform desteği eşitlendi.** README'de "Windows'ta çalıştırma" diye ayrı bir bölüm vardı;
+  sanki uygulama Windows'ta ek şartlarla çalışıyormuş gibi okunuyordu. Kaldırıldı, yerine üç
+  sistemi yan yana veren bir yapı kondu. Kodda da asimetri vardı: GStreamer/glib düzeltmesi
+  kütüphane yolunu sabit yazdığı için **ARM Linux'ta hiç çalışmıyordu**; artık çoklu-mimari
+  dizinleri taranıyor. Eğitimdeki yükleyici süreci varsayılanı Windows'ta da 0 oldu (o da
+  macOS gibi `spawn` kullanıyor).
 
 ### 4.0.0'da neler değişti
 
@@ -391,6 +405,31 @@ başlatılarak seçim her yere işlenir:
 
 ![English UI](gorseller/anasayfa_en.png)
 
+### ☀ / ☾ Açık ve koyu tema
+
+Dil düğmelerinin hemen altında tema seçimi var. Seçim `~/.config/boxify4/ayarlar.json`
+dosyasında dille birlikte saklanır ve dokuz aracın tamamına işler:
+
+![Koyu tema](gorseller/anasayfa_koyu.png)
+
+Koyu tema, araç kodlarının hiçbirine dokunmadan çalışıyor. Araçlar kendi ayrıntı stillerini
+`setStyleSheet` ile ve renkleri doğrudan yazarak veriyor — 119 çağrı, ~15 ayrı ton. Bunları tek
+tek düzenlemek hem riskliydi hem de sonradan yazılacak her araçta aynı işi gerektirirdi. Onun
+yerine dil desteğindeki desen uygulandı: `setStyleSheet` yamalanıyor ve koyu temada stil
+metnindeki açık palet renkleri koyu karşılıklarıyla değiştiriliyor.
+
+İki şey bilerek dışarıda bırakıldı:
+
+- **Veri renkleri** (tespit kutuları, sınıf renkleri, eğri renkleri) iki temada da aynıdır.
+  Renk körlüğü gözetilerek seçildiler ve koyu tuval üzerinde okunuyorlar; temaya göre
+  değiştirmek o dengeyi bozardı. Zaten yalnızca `QColor`/`QPainter` ile kullanılıyorlar,
+  dönüşüm ise sadece stil metinlerine bakıyor.
+- **Görüntü ve video tuvalleri** her iki temada da koyu kalır — kutu renkleri koyu zeminde
+  daha iyi seçilir.
+
+Kendi boyamasını yapan widget'lar (ör. Eğitim'deki kayıp/mAP eğrisi) rengi `tema.renk()`
+üzerinden ister; onlar için yamalama yeterli olmaz.
+
 ---
 
 ## Depo yapısı
@@ -406,7 +445,7 @@ Boxify/
 ├── kur.bat / kur.ps1         # Windows masaüstü + Başlat Menüsü kısayolu
 ├── gorseller/                # ekran görüntüleri
 └── boxify/
-    ├── __init__.py           # sürüm bilgisi (4.0.0)
+    ├── __init__.py           # sürüm bilgisi (4.1.0)
     ├── dil.py                # TR/EN dil eklentisi: sözlük + PyQt çeviri yamaları
     ├── tema.py               # ortak açık tema (beyaz + mavi, renk körlüğü dostu)
     ├── klasor_ac.py          # işletim sistemine göre "klasörü aç"

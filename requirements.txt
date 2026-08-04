@@ -1,4 +1,4 @@
-# Boxify 3 bağımlılıkları
+# Boxify 4 bağımlılıkları
 PyQt5>=5.15
 numpy
 opencv-python

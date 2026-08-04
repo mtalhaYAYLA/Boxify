@@ -174,6 +174,12 @@ SOZLUK = {
     "Dil değişikliği için uygulama yeniden başlatılacak. Devam edilsin mi?":
         "The application will restart to apply the language change. Continue?",
     "Dil değişikliği": "Language change",
+    "Tema": "Theme",
+    "Açık tema": "Light theme",
+    "Koyu tema": "Dark theme",
+    "Tema değişikliği": "Theme change",
+    "Tema değişikliği için uygulama yeniden başlatılacak. Devam edilsin mi?":
+        "The app will restart to apply the theme change. Continue?",
 
     # ── Ana sayfa ──
     "Nesne tespiti için veri seti ve model atölyesi":

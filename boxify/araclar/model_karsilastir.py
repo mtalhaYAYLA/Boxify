@@ -1489,7 +1489,11 @@ class MainWindow(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
-    app.setStyleSheet(STYLE)
+    # Tek başına çalıştırıldığında tema ayarını kabuk yüklemez; buradan okunur
+    from .. import tema as _tema
+    _tema.tema_yukle()
+    _tema.yamalari_kur()
+    app.setStyleSheet(_tema.stil())
     app.setApplicationName("Model Karşılaştır")
     win = MainWindow()
     win.show()

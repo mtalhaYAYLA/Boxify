@@ -1,16 +1,79 @@
-"""Boxify ortak teması — açık (light) tema.
+"""Boxify ortak teması — açık ve koyu tema.
 
 Tasarım dili (göz yormayan, düşük parlamalı):
-- Sayfa zemini yumuşak gri (#EFF1F5); kart/girdi zeminleri kırık beyaz
-  (#FBFCFD) — saf beyaz kullanılmaz, parlamayı azaltır.
-- Vurgu: yumuşatılmış profesyonel mavi (#2E6DA4); hover biraz açılır,
-  basılıda koyulaşır. Neon/doygun tonlardan kaçınılır.
-- Metin: yumuşak antrasit (#2B3442), ikincil metin gri (#6B7686).
+- Saf beyaz ve saf siyah kullanılmaz; ikisi de parlama/kontrast yorgunluğu yapar.
+- Vurgu: yumuşatılmış profesyonel mavi; hover biraz açılır, basılıda koyulaşır.
+  Neon/doygun tonlardan kaçınılır.
 - Köşeler yumuşak (6-10px), tüm tıklanabilir öğelerde hover/pressed efekti,
   girdilerde odak (focus) mavi çerçevesi.
 - Renk körlüğü kuralı korunur: kırmızı-yeşil ayrımına dayanılmaz; durumlar
   mavi tonları + metin + desenle verilir.
+
+## Koyu tema nasıl çalışıyor
+
+Araç modülleri kendi ayrıntı stillerini `setStyleSheet` ile, renkleri de
+doğrudan yazarak veriyor (119 çağrı, ~15 ayrı ton). Koyu temayı bu çağrıların
+hepsini elle düzenleyerek yapmak hem çok riskliydi hem de sonradan yazılacak
+her araçta aynı işi tekrar gerektirirdi.
+
+Onun yerine `dil.py`'nin dil için kullandığı desen uygulanıyor: `setStyleSheet`
+yamalanıyor ve koyu tema etkinken stil metnindeki açık palet renkleri koyu
+karşılıklarıyla değiştiriliyor. Araç kodlarına hiç dokunulmuyor; bundan sonra
+eklenecek araçlar da paletteki tonları kullandığı sürece kendiliğinden uyumlu
+olur.
+
+Tuvaller (görüntü/video önizlemeleri) bunun dışındadır: onlar iki temada da
+koyu kalır, çünkü kutu renkleri koyu zeminde daha iyi seçilir.
+
+Tema ayarı dil ile aynı dosyada saklanır: ~/.config/boxify4/ayarlar.json
 """
+
+import json
+import os
+
+TEMALAR = ("acik", "koyu")
+_tema = "acik"
+
+AYAR_DIZIN = os.path.join(os.path.expanduser("~"), ".config", "boxify4")
+AYAR_DOSYA = os.path.join(AYAR_DIZIN, "ayarlar.json")
+
+
+def tema_yukle() -> str:
+    """Kayıtlı temayı oku (yoksa/bozuksa açık)."""
+    global _tema
+    _tema = "acik"
+    try:
+        with open(AYAR_DOSYA, encoding="utf-8") as f:
+            kod = json.load(f).get("tema", "acik")
+        if kod in TEMALAR:
+            _tema = kod
+    except Exception:
+        pass
+    return _tema
+
+
+def tema_kaydet(kod: str):
+    if kod not in TEMALAR:
+        raise ValueError(kod)
+    os.makedirs(AYAR_DIZIN, exist_ok=True)
+    ayar = {}
+    try:
+        with open(AYAR_DOSYA, encoding="utf-8") as f:
+            ayar = json.load(f)
+    except Exception:
+        pass
+    ayar["tema"] = kod
+    with open(AYAR_DOSYA, "w", encoding="utf-8") as f:
+        json.dump(ayar, f, ensure_ascii=False, indent=2)
+
+
+def aktif_tema() -> str:
+    return _tema
+
+
+def koyu_mu() -> bool:
+    return _tema == "koyu"
+
 
 # ── Palet ────────────────────────────────────────────────────────────────────
 ARKA        = "#e6e9ee"   # sayfa zemini (yumuşak gri)
@@ -325,3 +388,119 @@ QDialog {{ background-color: {ARKA}; }}
 }}
 #IpucuGenel QLabel {{ background: transparent; }}
 """
+
+
+# ── Koyu tema ────────────────────────────────────────────────────────────────
+#
+# Açık palet tonu -> koyu karşılığı. Burada YALNIZCA arayüz kromu var:
+# zeminler, kenarlıklar, metin ve vurgu tonları.
+#
+# Veri renkleri (tespit kutuları, sınıf renkleri, eğri renkleri: #f5c518,
+# #00bcd4, #b39ddb, #9e9e9e, #8e6bbf, #d9a62e…) bilerek DIŞARIDA bırakıldı.
+# Onlar renk körlüğü gözetilerek seçildi ve koyu tuval üzerinde okunuyorlar;
+# temaya göre değiştirmek o dengeyi bozardı. Zaten yalnızca QPainter/QColor
+# ile kullanılıyorlar, aşağıdaki dönüşüm ise sadece stil metinlerine bakıyor.
+KOYU_HARITA = {
+    ARKA:        "#1b1f26",   # sayfa zemini
+    PANEL:       "#232830",   # bar / grup zeminleri
+    PANEL_KOYU:  "#2b313a",   # önizleme / ilerleme zemini
+    KENAR_ZEMIN: "#161a20",   # sol kenar çubuğu
+    GIRDI:       "#2b313a",   # kart / buton / girdi / liste zemini
+    KENARLIK:    "#3a4149",
+    KENARLIK_K:  "#49515b",
+    METIN:       "#e3e8ef",
+    METIN_ORTA:  "#c6cdd6",
+    METIN_SOLUK: "#98a3b0",
+    MAVI:        "#4a90d9",   # koyu zeminde okunması için biraz açıldı
+    MAVI_PARLAK: "#5ba0e6",
+    MAVI_BASILI: "#3d82c4",
+    MAVI_ZEMIN:  "#23374a",
+    # araç modüllerinde doğrudan yazılmış tonlar
+    "#f5f8fb":   "#f0f6fc",   # vurgu düğmesi üstündeki metin — açık kalmalı
+    "#f2f4f7":   "#e3e8ef",
+    "#42505f":   "#b9c2cd",
+    "#4d5765":   "#aeb8c4",
+    "#76818f":   "#8e99a7",
+    "#8b95a3":   "#7f8a98",
+    "#9aa5b1":   "#79848f",
+    "#9aa7b6":   "#7c8794",
+    "#c4ccd6":   "#49515b",
+    "#b6c0cc":   "#525b66",
+    "#d4dae2":   "#3a4149",
+    "#d8dde4":   "#333a43",
+    "#e3e8ee":   "#2b313a",
+    "#e4e8ee":   "#2b313a",
+    "#edf1f6":   "#2a313b",   # kart hover
+    "#f2f5f8":   "#262c35",   # eğitimdeki sabit şerit
+    "#b3c8dc":   "#2f5375",   # kaydırma çubuğu tutamacı
+    "#b7c9da":   "#3d82c4",
+    "#d6e2ee":   "#23374a",
+    "#ffffff":   "#232830",   # beyaz zeminler (grafik tuvali vb.)
+}
+
+_KOYU_ARAMA = {k.lower(): v for k, v in KOYU_HARITA.items()}
+
+
+def koyulastir(stil_metni: str) -> str:
+    """Bir stil metnindeki açık palet renklerini koyu karşılıklarıyla değiştirir.
+
+    Bilinmeyen renkler olduğu gibi kalır — veri renklerinin korunması bu
+    sayede oluyor.
+    """
+    if not stil_metni:
+        return stil_metni
+    import re as _re
+
+    def _degistir(m):
+        return _KOYU_ARAMA.get(m.group(0).lower(), m.group(0))
+
+    return _re.sub(r"#[0-9a-fA-F]{6}\b", _degistir, stil_metni)
+
+
+STYLE_KOYU = koyulastir(STYLE)
+
+
+def stil() -> str:
+    """Aktif temanın uygulama geneli stil metni."""
+    return STYLE_KOYU if koyu_mu() else STYLE
+
+
+def renk(acik_ton: str) -> str:
+    """Elle çizen (QPainter) widget'lar için tek renk çevirisi.
+
+    Stil metni yamalaması yalnızca `setStyleSheet` çağrılarını yakalar; kendi
+    boyamasını yapan widget'lar (ör. Eğitim'deki eğri) rengi buradan ister.
+    """
+    if not koyu_mu():
+        return acik_ton
+    return _KOYU_ARAMA.get(acik_ton.lower(), acik_ton)
+
+
+# ── Yamalar ──────────────────────────────────────────────────────────────────
+
+_yamalar_kuruldu = False
+
+
+def yamalari_kur():
+    """`setStyleSheet` çağrılarını koyu temaya çevir.
+
+    Araç modülleri kendi ayrıntı stillerini renkleri doğrudan yazarak veriyor.
+    Bunları tek tek düzenlemek yerine — dil desteğinde olduğu gibi — Qt API'si
+    yamalanıyor. Araç kodları temadan habersiz kalıyor, sonradan eklenecek
+    araçlar da paletteki tonları kullandıkça kendiliğinden uyumlu oluyor.
+
+    Açık temada yama kurulmaz; hiçbir maliyeti olmasın diye.
+    """
+    global _yamalar_kuruldu
+    if _yamalar_kuruldu or not koyu_mu():
+        return
+    from PyQt5 import QtWidgets as W
+
+    for sinif in (W.QWidget, W.QApplication):
+        ozgun = sinif.setStyleSheet
+
+        def sarmal(self, metin, _ozgun=ozgun):
+            return _ozgun(self, koyulastir(metin))
+
+        sinif.setStyleSheet = sarmal
+    _yamalar_kuruldu = True

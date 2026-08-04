@@ -21,6 +21,7 @@ from PyQt5.QtGui import QPixmap
 from . import SURUM
 from .araclar import ARACLAR, arac_bul
 from .dil import tr, aktif_dil, dil_kaydet
+from .tema import aktif_tema, tema_kaydet
 from .sayfalar.anasayfa import AnaSayfa, IKON_YOLU
 from .sayfalar.ipuclari import IpuclariSayfasi
 
@@ -132,6 +133,7 @@ class AnaPencere(QMainWindow):
         dikey.addStretch()
         dikey.addWidget(self._ayrac())
         dikey.addLayout(self._dil_satiri())
+        dikey.addLayout(self._tema_satiri())
         dip = QLabel("Nesne tespiti için veri seti,\netiketleme ve model atölyesi")
         dip.setObjectName("KenarDip")
         dip.setWordWrap(True)
@@ -182,6 +184,54 @@ class AnaPencere(QMainWindow):
         dil_kaydet(kod)
         # Araç pencereleri tembel yüklendiği için dilin her yere işlemesinin
         # tek güvenilir yolu temiz bir başlangıçtır
+        os.execl(sys.executable, sys.executable, *sys.argv)
+
+    # ── Tema (Açık/Koyu) ─────────────────────────────────────────────────
+    def _tema_satiri(self):
+        """Kenar çubuğu dibindeki açık/koyu tema değiştirici."""
+        satir = QHBoxLayout()
+        satir.setContentsMargins(16, 6, 16, 0)
+        satir.setSpacing(6)
+
+        etiket = QLabel(tr("Tema"))
+        etiket.setObjectName("DilEtiket")
+        satir.addWidget(etiket)
+        satir.addStretch()
+
+        self._tema_dugmeler = {}
+        for kod, yazi in (("acik", "☀"), ("koyu", "☾")):
+            dugme = QPushButton(yazi)
+            dugme.setObjectName("DilDugme")
+            dugme.setCheckable(True)
+            dugme.setChecked(aktif_tema() == kod)
+            dugme.setFixedWidth(40)
+            dugme.setCursor(Qt.PointingHandCursor)
+            dugme.setToolTip(tr("Açık tema") if kod == "acik" else tr("Koyu tema"))
+            dugme.clicked.connect(lambda _, k=kod: self._tema_degistir(k))
+            self._tema_dugmeler[kod] = dugme
+            satir.addWidget(dugme)
+        return satir
+
+    def _tema_dugme_tazele(self):
+        for kod, dugme in self._tema_dugmeler.items():
+            dugme.setChecked(aktif_tema() == kod)
+
+    def _tema_degistir(self, kod: str):
+        if kod == aktif_tema():
+            self._tema_dugme_tazele()
+            return
+        yanit = QMessageBox.question(
+            self, tr("Tema değişikliği"),
+            tr("Tema değişikliği için uygulama yeniden başlatılacak. "
+               "Devam edilsin mi?"),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+        if yanit != QMessageBox.Yes:
+            self._tema_dugme_tazele()
+            return
+        tema_kaydet(kod)
+        # Dil değişiminde olduğu gibi: araçlar tembel yüklendiği ve stilleri
+        # oluşturulurken bir kez uygulandığı için temanın her yere işlemesinin
+        # tek güvenilir yolu temiz bir başlangıç.
         os.execl(sys.executable, sys.executable, *sys.argv)
 
     def _ayrac(self) -> QFrame:
