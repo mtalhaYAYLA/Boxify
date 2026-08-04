@@ -1,0 +1,7 @@
+names:
+- ürün1
+nc: 1
+path: /home/arif/Desktop/New Folder/sa
+test: images/test
+train: images/train
+val: images/val
