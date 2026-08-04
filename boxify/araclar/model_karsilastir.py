@@ -34,7 +34,7 @@ from PyQt5.QtWidgets import (
     QCheckBox, QDoubleSpinBox, QSpinBox, QTextEdit, QTabWidget, QScrollArea,
     QListWidget, QListWidgetItem
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize
 from PyQt5.QtGui import QImage, QPixmap
 
 from ..tema import STYLE, MAVI  # ortak açık tema — bkz. boxify/tema.py
@@ -432,9 +432,21 @@ class PreviewLabel(QLabel):
         self.setAlignment(Qt.AlignCenter)
         self.setStyleSheet("background:#1c1f24; color:#9aa5b1; border:1px dashed #b4bfcb; "
                            "border-radius:8px; font-size:13px;")
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.setMinimumHeight(240)
+        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.setMinimumSize(220, 240)
         self._img = None
+
+    # QLabel, pixmap atanınca boyut talebini pixmap'in ölçüsü yapar. Önizleme
+    # kaydırma alanı içindeyken bu bir geri besleme döngüsü kurar: büyük
+    # pixmap -> araç genişler -> daha büyük pixmap… Araç görünür alanı aşar,
+    # yatay kaydırma çıkar ve mozaiğin sağ yarısı (yani ikinci/üçüncü model)
+    # ekran dışında kalır. Önizleme kendisine verilen yere sığar; bu yüzden
+    # boyut talebi pixmap'ten bağımsız ve küçük tutuluyor.
+    def minimumSizeHint(self):
+        return QSize(220, 240)
+
+    def sizeHint(self):
+        return QSize(480, 240)
 
     def set_image(self, img: QImage):
         self._img = img
@@ -528,9 +540,8 @@ class MainWindow(QMainWindow):
         # Çıktı grubu ZORUNLU olan klasör seçimini taşıdığı için hep açık —
         # zorunlu bir denetimi katlanmış bir grubun ardına saklamak, düğmeyi
         # bulunamaz hale getirir.
-        v.addWidget(self._katlanabilir(self._build_infer_group(), acik=False))
-        self._cikti_grubu = self._katlanabilir(self._build_output_group(), acik=False)
-        v.addWidget(self._cikti_grubu)
+        v.addWidget(self._build_infer_group())
+        v.addWidget(self._build_output_group())
         v.addStretch()
         scroll.setWidget(w)
         dis_v.addWidget(scroll, 1)
@@ -548,6 +559,20 @@ class MainWindow(QMainWindow):
         self.out_edit = QLineEdit()
         self.out_edit.setPlaceholderText("karşılaştırma videosunun kaydedileceği klasör")
         sv.addLayout(self._dir_row(self.out_edit, self._pick_out_dir))
+
+        # Çıktıyla ilgili iki kısayol da burada: iş bitince "Sonucu Aç"ı
+        # kaydırıp aramak zorunda kalmamak için şeritte duruyorlar
+        hb = QHBoxLayout()
+        hb.setSpacing(6)
+        self.open_dir_btn = QPushButton("Klasörü Aç")
+        self.open_dir_btn.clicked.connect(self._open_out_dir)
+        hb.addWidget(self.open_dir_btn)
+        self.play_btn = QPushButton("▶ Sonucu Aç")
+        self.play_btn.setEnabled(False)
+        self.play_btn.setToolTip("karsilastirma.mp4'ü sistem oynatıcısında açar")
+        self.play_btn.clicked.connect(self._play_result)
+        hb.addWidget(self.play_btn)
+        sv.addLayout(hb)
 
         self.start_btn = QPushButton("▶  Karşılaştırmayı Başlat")
         self.start_btn.setMinimumHeight(38)
@@ -597,35 +622,6 @@ class MainWindow(QMainWindow):
         h.addStretch()
         h.addWidget(widget)
         return h
-
-    @staticmethod
-    def _katlanabilir(grp: QGroupBox, acik: bool = False):
-        """Grubu başlığındaki kutucuktan açılıp kapanan hale getir.
-
-        Bu araçta ayar grubu diğer araçlardakinden fazla; hepsi birden açık
-        dururken sol panel görünür alanı aşıyor ve alttaki düğmeler kıvrımın
-        altında kalıyor. Nadir dokunulan gruplar kapalı başlar.
-        """
-        def widgetlar(duzen):
-            for i in range(duzen.count()):
-                oge = duzen.itemAt(i)
-                if oge.widget() is not None:
-                    yield oge.widget()
-                elif oge.layout() is not None:
-                    yield from widgetlar(oge.layout())
-
-        icerik = list(widgetlar(grp.layout()))
-        grp.setCheckable(True)
-        grp.setChecked(acik)
-
-        def uygula(ac):
-            for c in icerik:
-                c.setVisible(ac)
-            grp.layout().activate()
-
-        grp.toggled.connect(uygula)
-        uygula(acik)
-        return grp
 
     def _build_video_group(self) -> QGroupBox:
         grp = QGroupBox("Video")
@@ -707,8 +703,8 @@ class MainWindow(QMainWindow):
         path_edit = QLineEdit()
         path_edit.setPlaceholderText("model.pt seç")
         rozet_row.addLayout(self._dir_row(path_edit, lambda _=None, idx=i: self._pick_model(idx)))
-        remove_btn = QPushButton("✕")
-        remove_btn.setFixedWidth(28)
+        remove_btn = QPushButton("Kaldır")
+        remove_btn.setFixedWidth(64)
         remove_btn.setToolTip("Bu modeli karşılaştırmadan çıkar")
         remove_btn.clicked.connect(lambda _=False, idx=i: self._model_kaldir(idx))
         rozet_row.addWidget(remove_btn)
@@ -903,16 +899,6 @@ class MainWindow(QMainWindow):
         self.indiv_chk.setToolTip("karsilastirma.mp4 dışında her model için ayrı bir mp4 yazılır")
         go.addWidget(self.indiv_chk)
 
-        hb = QHBoxLayout()
-        self.open_dir_btn = QPushButton("Klasörü Aç")
-        self.open_dir_btn.clicked.connect(self._open_out_dir)
-        hb.addWidget(self.open_dir_btn)
-        self.play_btn = QPushButton("▶ Sonucu Aç")
-        self.play_btn.setEnabled(False)
-        self.play_btn.setToolTip("karsilastirma.mp4'ü sistem oynatıcısında açar")
-        self.play_btn.clicked.connect(self._play_result)
-        hb.addWidget(self.play_btn)
-        go.addLayout(hb)
         return grp
 
     def _build_center(self) -> QWidget:
@@ -1460,12 +1446,8 @@ class MainWindow(QMainWindow):
         self.stats_lbl.setText(
             f"İşlenen {cfg['islenen_kare']} kare | tespitler → {toplamlar}")
         self.status.showMessage("Bitti. " + self.stats_lbl.text())
-        hazir = bool(cfg["combined_path"]) and os.path.exists(cfg["combined_path"])
-        self.play_btn.setEnabled(hazir)
-        # "Sonucu Aç" katlanmış grubun içinde; iş bitince kullanıcının onu
-        # aramak zorunda kalmaması için grubu kendiliğinden aç
-        if hazir:
-            self._cikti_grubu.setChecked(True)
+        self.play_btn.setEnabled(bool(cfg["combined_path"])
+                                 and os.path.exists(cfg["combined_path"]))
 
     def _save_report(self):
         text = self.report_box.toPlainText()

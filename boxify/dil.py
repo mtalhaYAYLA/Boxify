@@ -857,6 +857,7 @@ SOZLUK = {
     "Görünüm ve Ek Çıktılar": "Appearance and Extra Outputs",
     "Çıktı klasörü": "Output folder",
     "Bu modeli karşılaştırmadan çıkar": "Drop this model from the comparison",
+    "Kaldır": "Remove",
     "Mozaik düzeni": "Mosaic layout",
     "Yan yana (yatay)": "Side by side (horizontal)",
     "Alt alta (dikey)": "Stacked (vertical)",

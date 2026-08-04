@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import (
     QComboBox, QProgressBar, QCheckBox, QDoubleSpinBox, QSpinBox, QTextEdit,
     QAbstractItemView
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize
 from PyQt5.QtGui import QImage, QPixmap
 
 from ..tema import STYLE  # ortak açık tema — bkz. boxify/tema.py
@@ -238,9 +238,21 @@ class PreviewLabel(QLabel):
         super().__init__("Önizleme — soldaki listeden bir görsel seç")
         self.setAlignment(Qt.AlignCenter)
         self.setStyleSheet("background:#eceff3; color:#6b7686; border:1px dashed #b4bfcb; border-radius:8px; font-size:13px;")
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.setMinimumHeight(240)
+        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.setMinimumSize(220, 240)
         self._img = None
+
+    # QLabel, pixmap atanınca boyut talebini pixmap'in ölçüsü yapar. Önizleme
+    # kaydırma alanı içindeyken bu bir geri besleme döngüsü kurar: büyük
+    # pixmap -> araç genişler -> daha büyük pixmap… Araç görünür alanı aşar,
+    # yatay kaydırma çıkar ve mozaiğin sağ yarısı (yani ikinci/üçüncü model)
+    # ekran dışında kalır. Önizleme kendisine verilen yere sığar; bu yüzden
+    # boyut talebi pixmap'ten bağımsız ve küçük tutuluyor.
+    def minimumSizeHint(self):
+        return QSize(220, 240)
+
+    def sizeHint(self):
+        return QSize(480, 240)
 
     def set_image(self, img: QImage):
         self._img = img

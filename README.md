@@ -155,9 +155,14 @@ git checkout main        # güncele dön
   gömmeden *önce* çağrılırsa o pencere ayakta kalıp konumunu eski koordinatlarından bildiriyordu.
   Araç doğru yerde çiziliyor ama fare isabeti yüzlerce piksel ötede aranıyordu (çok monitörlü
   kurulumda çok belirgin). Artık önce reparent, sonra bayrak. Bkz. [Teknik notlar](#teknik-notlar).
-- **Sol panel erişilebilirliği** — Model Karşılaştır'da ayarlar görünür alanı aşıp en çok
-  kullanılan düğmeleri kıvrımın altında bırakıyordu. Zorunlu denetimler (çıktı klasörü, Başlat,
-  İptal) artık kaydırmayan bir şeritte sabit duruyor; nadir kullanılan ayar grupları katlanabilir.
+- **Önizlemede tek panel görünüyordu** — `QLabel` kendisine pixmap atanınca boyut talebini
+  pixmap kadar yapar. Önizleme kaydırma alanı içindeyken bu bir geri besleme döngüsü kuruyordu
+  (büyük pixmap → araç genişler → daha büyük pixmap); araç görünür alanı aşıp yatay kaydırmaya
+  düşüyor ve mozaiğin sağ yarısı, yani ikinci/üçüncü model, ekran dışında kalıyordu. Önizlemenin
+  boyut talebi artık pixmap'ten bağımsız.
+- **Sol panel erişilebilirliği** — Model Karşılaştır'da en çok kullanılan denetimler kıvrımın
+  altında kalıyordu. Çıktı klasörü, Klasörü Aç / Sonucu Aç, Başlat ve İptal artık kaydırmayan bir
+  şeritte sabit duruyor.
 - **Depo düzleştirildi** — kod artık kökte tek bir ağaçta (`boxify.py` + `boxify/`); eski sürüm
   klasörleri kaldırıldı, geçmiş yukarıdaki tag'lerde duruyor.
 - **Cihaz seçimi platforma göre** — Apple donanımında artık `cuda:0` yerine **GPU (Apple MPS)**
@@ -344,6 +349,9 @@ tag'e geçebilirsin — bkz. [Sürüm geçmişi](#sürüm-geçmişi).
   koyar (ör. 1360×840). Yığına doğrudan gömülseler bu sınır ana pencereye taşınır ve her yeni
   araçta pencere zorla büyür. Bu yüzden her araç sayfası bir kaydırma alanına sarılır: pencere
   küçük kalabilir, sığmayan araç kendi içinde kaydırılır.
+- **Önizleme boyut talebi:** Görsel önizleyen `QLabel`'lar (Model Karşılaştır, Oto Label) boyut
+  taleplerini pixmap'ten değil sabit küçük bir değerden bildirir. Aksi hâlde kaydırma alanı içinde
+  pixmap ↔ genişlik geri beslemesi kurulur ve araç görünür alanı aşar.
 - **Gömme sırası (fare isabeti):** Araç sayfası önce kaydırma alanına verilir, `setWindowFlags(
   Qt.Widget)` ancak ondan sonra çağrılır. Ters sırada, araç üst düzeyken aldığı yerel pencere
   ayakta kalır ve fare isabet testi widget'ları gerçekte çizildikleri yerde değil, o hayalet
