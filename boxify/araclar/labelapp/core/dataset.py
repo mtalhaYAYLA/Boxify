@@ -238,8 +238,20 @@ class Dataset:
             yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
         return out_path
 
-    def export(self, out_dir: str, train_r: float, val_r: float, test_r: float) -> str:
+    def export(self, out_dir: str, train_r: float, val_r: float, test_r: float,
+               grupla: bool = True, hash_esik: int = 5, ilerleme=None) -> str:
+        """Etiketli görselleri train/val/test olarak dışa aktarır.
+
+        `grupla` açıkken bölme, yakın-kopya karelerini gruplayarak yapılır:
+        aynı sahnenin tekrar eden kareleri hep aynı bölüme düşer. Bu kareler
+        video karelerinden geldiği için komşu kareler birbirinin neredeyse
+        aynısıdır; rastgele bölünürse aynı an hem train'e hem val'e girer ve
+        val ölçümü gerçekte olduğundan iyi çıkar. Dağıtım Veri Denetçi ile
+        aynı koddan gelir (boxify/araclar/veri_bolme.py).
+        """
         from PyQt5.QtGui import QImageReader
+        from ...veri_bolme import bolumlere_dagit, kopya_grup_anahtarlari
+
         for split in ('train', 'val', 'test'):
             os.makedirs(os.path.join(out_dir, 'images', split), exist_ok=True)
             os.makedirs(os.path.join(out_dir, 'labels', split), exist_ok=True)
@@ -264,20 +276,15 @@ class Dataset:
             if img.bboxes:  # gerçekten bbox var mı kontrol et
                 labeled.append(img)
 
-        random.shuffle(labeled)
-        n = len(labeled)
-        n_train = max(1, int(n * train_r))
-        n_val   = max(0, int(n * val_r))
+        if grupla:
+            anahtarlar = kopya_grup_anahtarlari(
+                [a.image_path for a in labeled], hash_esik, ilerleme)
+        else:
+            anahtarlar = [f"tek{i}" for i in range(len(labeled))]
 
-        splits = {
-            'train': labeled[:n_train],
-            'val':   labeled[n_train:n_train + n_val],
-            'test':  labeled[n_train + n_val:],
-        }
-
-        # YOLO val boş olamaz — train'den al
-        if not splits['val'] and splits['train']:
-            splits['val'] = splits['train'][:max(1, len(splits['train']) // 2)]
+        kova = bolumlere_dagit(anahtarlar, (train_r, val_r, test_r))
+        splits = {ad: [labeled[i] for i in idxs] for ad, idxs in kova.items()}
+        self.son_grup_sayisi = len(set(anahtarlar))
 
         for split_name, imgs in splits.items():
             for ann in imgs:

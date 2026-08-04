@@ -84,7 +84,7 @@ KALIPLAR = [(re.compile(d), k) for d, k in [
     (r"^•  (.+)$", "•  {}"),
     (r"^— (.+)$", "— {}"),
     # kenar çubuğu: "amblem + iki boşluk + araç adı" (ör. "✂  Video Kırpıcı")
-    (r"^([✂▣⚡✎☰◔⇥⚖])  (.+)$", "{}  {}"),
+    (r"^([✂▣⚡✎☰◔⇥⚖◈])  (.+)$", "{}  {}"),
     (r"^sürüm (.+)$", "version {}"),
     # Model Karşılaştır: yuva adı ipucu ve sınıf/kare sayaçları
     (r"^Panelde görünecek ad \(ör\. YOLOv8n\) — boşsa Model (.+)$",
@@ -192,6 +192,7 @@ SOZLUK = {
     "Kare Alıcı": "Frame Grabber",
     "Oto Label": "Auto Label",
     "Veri Denetçi": "Data Inspector",
+    "Eğitim": "Training",
     "Hata Analizi": "Error Analysis",
     "Model Karşılaştır": "Model Comparison",
 
@@ -206,6 +207,8 @@ SOZLUK = {
         "Fix / complete labels by hand",
     "Veriyi denetle, kopyaları ayıkla, sızıntısız böl":
         "Inspect data, weed out duplicates, split without leakage",
+    "Veri setini modele dönüştür, kendi modelinin üstüne devam et":
+        "Turn the dataset into a model, continue from your own model",
     "Model nerede yanılıyor + sırada ne etiketlenmeli":
         "Where the model fails + what to label next",
     "Aynı videoda 1-3 modeli ve seçilen sınıfları kıyasla":
@@ -1021,6 +1024,138 @@ SOZLUK = {
     "Train:": "Train:",
     "Val:": "Val:",
     "Çıktı:": "Output:",
+
+    # ── Eğitim ──
+    "Eğitim — veri setinden model": "Training — dataset to model",
+    "data.yaml Seç…": "Choose data.yaml…",
+    "Model (.pt) Seç…": "Choose Model (.pt)…",
+    "Çıktı Klasörü Seç…": "Choose Output Folder…",
+    "data.yaml seç → başlangıç ağırlığını seç → Eğitimi Başlat":
+        "Choose data.yaml → choose the starting weights → Start Training",
+    "Veri seti": "Dataset",
+    "data.yaml (Veri Denetçi ya da Labelapp çıktısı)":
+        "data.yaml (output of Data Inspector or Labelapp)",
+    "data.yaml seç": "choose data.yaml",
+    "Eğitimden önce sızıntı denetimi yap": "Check for leakage before training",
+    "train ve val aynı sahnenin karelerini paylaşıyorsa doğrulama skoru\n"
+    "gerçekte olduğundan yüksek çıkar. Denetim bunu eğitim başlamadan söyler.":
+        "If train and val share frames of the same scene, the validation score\n"
+        "comes out higher than it really is. This check says so before training.",
+    "Başlangıç ağırlığı": "Starting weights",
+    "Hazır ağırlık": "Stock weights",
+    "Kendi modelimden devam et (.pt)": "Continue from my own model (.pt)",
+    "Önceki turun best.pt'sini seçersen eğitim sıfırdan değil, o modelin\n"
+    "üstüne devam eder — ince ayar döngüsünün çalışma biçimi budur.":
+        "If you pick the previous round's best.pt, training continues on top of\n"
+        "that model instead of starting over — this is how the fine-tune loop works.",
+    "Başlangıç ağırlığı seç": "Choose starting weights",
+    "Eğitim ayarları": "Training settings",
+    "Epoch": "Epochs",
+    "Batch": "Batch",
+    "Bellek yetmezse düşür (ör. 8 ya da 4)":
+        "Lower it if you run out of memory (e.g. 8 or 4)",
+    "Sabır (erken durdurma)": "Patience (early stopping)",
+    "Erken durdurma: bu kadar epoch boyunca doğrulama skoru\n"
+    "iyileşmezse eğitim kendiliğinden biter. 0 = kapalı.":
+        "Early stopping: if the validation score does not improve for this many\n"
+        "epochs, training ends by itself. 0 = off.",
+    "Yükleyici süreci": "Loader processes",
+    "Veri yükleyici süreç sayısı. macOS'ta 0 önerilir: fazlası\n"
+    "arayüzden başlatılan eğitimde takılmaya yol açabiliyor.":
+        "Number of data loader processes. 0 is recommended on macOS: more than\n"
+        "that can hang training started from the GUI.",
+    "İleri ayarlar": "Advanced settings",
+    "Optimizer": "Optimizer",
+    "Başlangıç lr": "Initial lr",
+    "optimizer=auto iken ultralytics bunu kendisi seçebilir":
+        "with optimizer=auto, ultralytics may pick this itself",
+    "Dondurulacak katman": "Layers to freeze",
+    "İlk N katmanı dondur. Az veriyle ince ayarda 10 civarı işe yarar;\n"
+    "0 = hiçbir katman donmaz.":
+        "Freeze the first N layers. Around 10 helps when fine-tuning with little\n"
+        "data; 0 = nothing is frozen.",
+    "Tohum": "Seed",
+    "Ara kayıt sıklığı": "Checkpoint interval",
+    "Her N epoch'ta ara ağırlık kaydet. 0 = kapalı.":
+        "Save intermediate weights every N epochs. 0 = off.",
+    "Yarım kalan eğitimi sürdür (resume)": "Resume an unfinished run",
+    "Kendi modelin olarak bir çalışmanın last.pt'sini seçtiysen, eğitim\n"
+    "o çalışmanın kaldığı epoch'tan devam eder.":
+        "If you picked a run's last.pt as your own model, training continues from\n"
+        "the epoch that run stopped at.",
+    "ultralytics grafiklerini de üret": "Also produce ultralytics plots",
+    "runs klasörü seç (boşsa data.yaml yanına)":
+        "choose a runs folder (defaults to next to data.yaml)",
+    "best.pt Yolunu Kopyala": "Copy best.pt Path",
+    "▶  Eğitimi Başlat": "▶  Start Training",
+    "Sıradaki epoch sınırında durur; o ana kadarki en iyi ağırlık korunur":
+        "Stops at the next epoch boundary; the best weights so far are kept",
+    "Eğitim başlayınca kayıp ve mAP eğrisi burada çizilir":
+        "The loss and mAP curves are drawn here once training starts",
+    "Eğitim sürüyor…": "Training in progress…",
+    "Eğitim sürüyor": "Training in progress",
+    "Eğitim başarısız": "Training failed",
+    "Eğitim başarısız.": "Training failed.",
+    "Sızıntı bulundu": "Leakage found",
+    "Denetim yapılamadı": "Check could not be run",
+    "Sızıntı denetimi: train ve val aynı kareleri paylaşıyor mu?":
+        "Leakage check: do train and val share the same frames?",
+    "Sızıntı yok — train ve val ayrı sahnelerden.":
+        "No leakage — train and val come from separate scenes.",
+    "Denetim iptal edildi.": "Check cancelled.",
+    "Eğitim başlatılmadı; önce bölmeyi düzelt.":
+        "Training not started; fix the split first.",
+    "Sızıntıya rağmen devam edildi — skorları buna göre oku.":
+        "Continued despite leakage — read the scores accordingly.",
+    "Veri yok": "No data",
+    "Önce bir data.yaml seç.": "Choose a data.yaml first.",
+    "Kendi modelinden devam etmek için bir .pt seç.":
+        "Choose a .pt to continue from your own model.",
+
+    # ── Veri Birleştir ──
+    "⇉  Veri Setlerini Birleştir…": "⇉  Merge Datasets…",
+    "Veri Setlerini Birleştir — sınıf eşlemeli":
+        "Merge Datasets — with class mapping",
+    "Kaynak veri setleri": "Source datasets",
+    "+ Veri Seti Ekle…": "+ Add Dataset…",
+    "Seçileni Kaldır": "Remove Selected",
+    "Henüz veri seti eklenmedi": "No dataset added yet",
+    "Sınıf eşleme": "Class mapping",
+    "Hedef sınıflar (virgülle, sıra = id):":
+        "Target classes (comma separated, order = id):",
+    "kaynaklardan otomatik doldurulur": "filled in automatically from the sources",
+    "Otomatik Eşle": "Auto Map",
+    "Aynı isimli sınıfları eşleştirir, kalanları hedefe ekler":
+        "Maps classes with the same name, appends the rest to the target",
+    "(atla — bu sınıfı alma)": "(skip — leave this class out)",
+    "birleştirilmiş setin yazılacağı klasör":
+        "folder the merged dataset is written to",
+    "Görseller:": "Images:",
+    "Kopyala (güvenli)": "Copy (safe)",
+    "Sembolik bağ (yer kaplamaz)": "Symlink (takes no space)",
+    "Kutusu kalmayan görselleri alma": "Leave out images with no boxes left",
+    "⇉  Birleştir": "⇉  Merge",
+    "Birleştirme bitti": "Merge finished",
+    "Birleşik seti denetle": "Inspect the merged set",
+    "Birleştirilen veri seti denetime yüklensin mi?":
+        "Load the merged dataset into the inspector?",
+    "Kaynak yok": "No source",
+    "En az bir veri seti ekle.": "Add at least one dataset.",
+    "Hedef sınıf yok": "No target class",
+    "Hiç sınıf seçilmedi": "No class selected",
+    "Klasör dolu": "Folder not empty",
+    "Geçersiz klasör": "Invalid folder",
+    "Ad (dosya ön eki)": "Name (file prefix)",
+    "Görsel klasörü": "Image folder",
+    "Görsel": "Images",
+    "Sınıf": "Classes",
+    "Kaynak": "Source",
+    "Kaynak sınıfı": "Source class",
+    "id": "id",
+    "Hedef sınıfı": "Target class",
+    "Veri setinin görsel klasörü": "The dataset's image folder",
+    "Boş klasör": "Empty folder",
+    "Bu klasörde görsel bulunamadı.": "No images found in this folder.",
 }
 
 

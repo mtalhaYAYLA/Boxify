@@ -95,6 +95,27 @@ ARACLAR = [
         ],
     },
     {
+        "anahtar": "egitim",
+        "ad": "Eğitim",
+        "amblem": "◈",
+        "modul": "boxify.araclar.egitim",
+        "ozet": "Veri setini modele dönüştür, kendi modelinin üstüne devam et",
+        "aciklama": "Veri Denetçi'nin ürettiği data.yaml'ı eğitir. Hazır bir ağırlıktan "
+                    "ya da kendi best.pt'nden devam eder; cihaz, erken durdurma ve katman "
+                    "dondurma ayarlanabilir, kayıp ve mAP eğrisi epoch epoch çizilir. "
+                    "Başlamadan önce train/val sızıntısını denetler.",
+        "ipuclari": [
+            "İkinci turdan itibaren 'kendi modelimden devam et' ile önceki turun "
+            "best.pt'sini seç; sıfırdan eğitmek hem zaman kaybı hem de öğrenileni atmaktır.",
+            "Sızıntı uyarısını ciddiye al: train ve val aynı sahnenin karelerini "
+            "paylaşıyorsa mAP gerçekte olduğundan yüksek çıkar ve model sahada seni yanıltır.",
+            "Az veriyle ince ayarda ilk katmanları dondurmayı dene (10 civarı) — "
+            "hazır modelin öğrendiği genel özellikler korunur.",
+            "Erken durdurma açıkken epoch'u cömert ver: eğitim iyileşme durunca "
+            "kendiliğinden biter, boşuna beklemezsin.",
+        ],
+    },
+    {
         "anahtar": "hata_analizi",
         "ad": "Hata Analizi",
         "amblem": "◔",

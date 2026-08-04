@@ -2,6 +2,18 @@ __pycache__/
 *.pyc
 *.bak
 .config/
-*.pt
-*.mp4
 .DS_Store
+
+# Model ağırlıkları ve dışa aktarma çıktıları (depoya girmez)
+*.pt
+*.onnx
+*.engine
+*.torchscript
+*_openvino_model/
+
+# Medya ve eğitim çıktıları
+*.mp4
+runs/
+
+# Yerel sanal ortam
+.venv/

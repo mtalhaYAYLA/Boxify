@@ -2,7 +2,7 @@
 
 Boxify, bir **nesne tespit (object detection) modeli** üretmenin bütün adımlarını tek çatı altında
 toplayan, PyQt5 ile yazılmış bir masaüstü uygulamasıdır: videodan kare çıkarma, otomatik ve elle
-etiketleme, veri seti denetimi, hata analizi, model karşılaştırma ve model export.
+etiketleme, veri seti denetimi, **eğitim**, hata analizi, model karşılaştırma ve model export.
 
 Belirli bir alana bağlı değildir — balon, araç, ürün, kusur… hangi nesneyi tanımak istersen aynı
 akış geçerlidir. Etiket biçimi YOLO txt'dir ve araçlar Ultralytics YOLO modelleriyle çalışır.
@@ -80,52 +80,49 @@ Dikkat edilecekler:
   doğru komutu seçer (Windows'ta `os.startfile`, macOS'ta `open`, Linux'ta `xdg-open`) — ek bir
   ayar gerekmez.
 
-### 3) (İsteğe bağlı) Linux uygulama menüsüne ekle
+### 3) (İsteğe bağlı) Uygulama listesine ekle
 
-Her seferinde terminalden `python boxify.py` yazmak yerine, uygulamayı sistemin uygulama
-menüsüne kaydedebilirsin:
+Her seferinde terminalden `python boxify.py` yazmak yerine Boxify'ı işletim sisteminin uygulama
+listesine kaydedebilirsin. **macOS ve Linux'ta `kur.sh`, Windows'ta `kur.bat`** — ikisi de
+sistemi kendi tanır ve o sisteme uygun kurulumu yapar.
 
 ```bash
-./kur.sh          # menüye "Boxify" olarak ekler (ikonuyla birlikte)
+./kur.sh            # macOS ve Linux
+./kur.sh kaldir     # geri al
 ```
 
-`kur.sh` şunları otomatik yapar:
+```powershell
+.\kur.bat           # Windows
+.\kur.bat kaldir    # geri al
+```
 
-- PATH üzerinde PyQt5 içeren ilk python'u bulur ve kısayola onu yazar,
-- `ikon.png`'yi 512×512 kareye getirip hicolor ikon temasına kurar,
-- `~/.local/share/applications/boxify.desktop` dosyasını oluşturur.
+Sisteme göre ne ürettiği:
+
+| Sistem | Ürettiği | Nerede görünür |
+|---|---|---|
+| **macOS** | `~/Applications/Boxify.app` (Info.plist + `.icns` ikon) | Launchpad, Spotlight; Dock'a sabitlenebilir |
+| **Linux** | `~/.local/share/applications/boxify.desktop` + hicolor ikonu | Uygulama menüsü / Show Apps |
+| **Windows** | Masaüstünde ve Başlat Menüsü'nde `Boxify.lnk` (`ikon.ico` ile) | Masaüstü, Başlat Menüsü |
+
+Her üçü de python'u aynı mantıkla arar: önce **PyQt5 *ve* ultralytics'in birlikte bulunduğu**
+bir yorumlayıcı; yoksa PyQt5 yeten biri seçilir ama eksik paket açıkça söylenir. Sıra
+`BOXIFY_PYTHON` → etkin sanal ortam → `.venv` → conda ortamları → sistem python'u şeklindedir.
+Kullanmak istediğini elle de gösterebilirsin:
+
+```bash
+BOXIFY_PYTHON=/opt/anaconda3/envs/boxify/bin/python ./kur.sh
+```
+
+> Neden ultralytics de aranıyor? conda kullananlarda `base` ortamında PyQt5 hazır gelir ama
+> ultralytics gelmez. Sadece PyQt5'e bakan bir kurulum tam da o ortamı seçer; uygulama açılır,
+> ama dokuz araçtan beşi ilk tıklamada "eksik bağımlılık" der.
 
 Beklenen çıktı şuna benzer:
 
 ![Kurulum terminali](gorseller/kurulum_terminal.png)
 
-Menüde görünmezse oturumu (ya da sadece masaüstü ortamını) yeniden başlatmak genelde yeterlidir.
-Klasörün adı ya da yeri değişirse `kur.sh`'ı bir kez daha çalıştırmak yeterlidir — kısayolu yeni
-yola göre kendisi yeniden yazar. Kaldırmak için:
-
-```bash
-./kur.sh kaldir
-```
-
-### 3b) (İsteğe bağlı) Windows masaüstü + Başlat Menüsü kısayolu
-
-Linux'taki `kur.sh`'ın karşılığı `kur.bat` — çift tıklayarak ya da PowerShell'den çalıştır:
-
-```powershell
-.\kur.bat
-```
-
-`kur.bat` (arka planda `kur.ps1` çalıştırır) şunları otomatik yapar:
-
-- PATH üzerinde PyQt5 içeren `pythonw`/`python`'u bulur,
-- `ikon.png`'yi kareye tamamlayıp `ikon.ico`'ya çevirir,
-- Masaüstüne ve Başlat Menüsü'ne `Boxify.lnk` kısayolunu ekler.
-
-Kaldırmak için:
-
-```powershell
-.\kur.bat kaldir
-```
+Klasörün adı ya da yeri değişirse betiği bir kez daha çalıştır — kısayolu yeni yola göre
+kendisi yeniden yazar. Linux'ta menüde görünmezse oturumu yenilemek genelde yeterlidir.
 
 ---
 
@@ -145,7 +142,37 @@ git checkout main        # güncele dön
 | [`v2.0.0`](../../releases/tag/v2.0.0) | 7 araç **tek uygulamada** birleşti: kenar çubuklu kabuk, tembel yükleme, "araç zinciri" anlatımı |
 | [`v2.0.1`](../../releases/tag/v2.0.1) | Ürünleştirme: **açık beyaz-mavi tema**, İpuçları sayfası, zincir/adım numaraları kaldırıldı, metinler alan-bağımsız hâle getirildi |
 | [`v2.0.2`](../../releases/tag/v2.0.2) | **TR/EN arayüz dili**: çeviri, araç kodlarına dokunmayan bir dil eklentisiyle (`dil.py`) yapıldı |
-| [`v3.0.0`](../../releases/tag/v3.0.0) | **⚖ Model Karşılaştır** (sekizinci araç) + arayüz akıcılığı düzeltmeleri; depo tek kod tabanına düzleştirildi — **güncel sürüm** |
+| [`v3.0.0`](../../releases/tag/v3.0.0) | **⚖ Model Karşılaştır** (sekizinci araç) + arayüz akıcılığı düzeltmeleri; depo tek kod tabanına düzleştirildi |
+| [`v3.1.0`](../../releases/tag/v3.1.0) | **◈ Eğitim** (dokuzuncu araç) + veri seti birleştirme/sınıf eşleme + sızıntılı bölme hatasının düzeltilmesi + platforma göre kurulum — **güncel sürüm** |
+
+### 3.1.0'da neler değişti
+
+- **◈ Eğitim — dokuzuncu araç.** Döngünün kapandığı yer. Eğitim daha önce Labelapp'in içinde bir
+  diyalogdu ve yalnızca hazır ağırlıklardan (`yolo11m` gibi) başlayabiliyordu; **kendi `best.pt`'nin
+  üstüne devam etmek mümkün değildi**, yani ince ayar döngüsü aslında hiç kapanmıyordu. Yeni araçta
+  başlangıç ağırlığı herhangi bir `.pt` olabilir; cihaz (MPS/CUDA/CPU), erken durdurma, katman
+  dondurma, resume ve ara kayıt ayarlanır, kayıp ve mAP eğrisi epoch epoch çizilir.
+- **Sızıntılı bölme hatası kapatıldı.** Labelapp'in veri seti dışa aktarımı `random.shuffle` ile
+  bölüyordu — oysa bu uygulamada görseller ardışık video karelerinden gelir ve komşu kareler
+  birbirinin neredeyse aynısıdır. Aynı an hem train'e hem val'e düşünce doğrulama skoru şişiyor,
+  model ezberlediği hâlde iyi görünüyordu. Gerçek karelerle ölçüldüğünde **4 sahnenin 3'ü ikiye
+  bölünüyordu; gruplama sonrası sıfır.** Bölme artık Veri Denetçi ile aynı koddan geliyor
+  (`boxify/araclar/veri_bolme.py`) ve ikinci bir bölme kodu yok.
+- **Eğitim öncesi sızıntı denetimi.** Eğitim başlamadan `data.yaml`'daki train ve val bölümleri
+  yakın-kopya için taranır; ortak sahne bulunursa örnekleriyle birlikte söylenir ve eğitim
+  kullanıcı onaylamadan başlamaz.
+- **⇉ Veri seti birleştirme + sınıf eşleme** (Veri Denetçi'den açılır). Farklı setlerde sınıf
+  id'leri çakışır — birinde `0=kamyon`, ötekinde `0=tır` olabilir; üst üste kopyalamak etiketleri
+  sessizce bozar. Artık her kaynağın her sınıfının hedefte neye denk geleceği tek tek seçilir,
+  aynı isimliler kendiliğinden eşlenir, istenmeyen sınıf `(atla)` ile düşürülür. Dosya adı
+  çakışması kaynak ön ekiyle çözülür.
+- **Kurulum işletim sistemine göre.** `kur.sh` yalnızca Linux'a `.desktop` yazıyordu; macOS'ta
+  hiçbir işe yaramadığı hâlde "kuruldu" diyordu. Artık macOS'ta gerçek bir `Boxify.app` paketi
+  (`Info.plist` + `sips`/`iconutil` ile `.icns`) üretiyor. Üç betik de python'u ararken PyQt5'in
+  yanında **ultralytics'i de** arıyor — conda `base` ortamı bu yüzden yanlışlıkla seçiliyordu.
+- **Kare Alıcı ffmpeg yokken sessizce ölüyordu** — `Popen` iş parçacığının içinde patlıyor, hiçbir
+  sinyal çıkmıyor ve arayüz ilerlemeyen bir çubukta asılı kalıyordu. Artık hata kurulum komutuyla
+  birlikte bildiriliyor ve denetim açılışta yapılıyor.
 
 ### 3.0.0'da neler değişti
 
@@ -189,24 +216,25 @@ flowchart LR
     C --> D["⚡ Oto Label"]
     D --> E["✎ Labelapp"]
     E --> F["☰ Veri Denetçi"]
-    F --> G["🏋 Eğitim (yolo train)"]
+    F --> G["◈ Eğitim"]
     G --> H["◔ Hata Analizi"]
     H -->|"yeni veri turu"| D
+    G -->|"best.pt üstüne devam"| G
     G --> J["⚖ Model Karşılaştır"]
     G --> I["⇥ Model Export"]
     J -->|"kazanan model"| I
 ```
 
-Eğitim adımı uygulama dışıdır (`yolo train data=.../data.yaml`); Boxify eğitimin **öncesini**
-(veri hazırlığı) ve **sonrasını** (analiz + export) üstlenir. Hata Analizi'nin çıktısı yeni bir
-etiketleme turunu besler — döngü, model hedef başarıya ulaşana kadar döner.
+Zincirin tamamı uygulamanın içindedir — eğitim dahil. Hata Analizi'nin çıktısı yeni bir
+etiketleme turunu besler ve Eğitim aynı `best.pt`'nin üstünden devam eder; döngü, model hedef
+başarıya ulaşana kadar döner.
 
 ---
 
 ## Araçlar
 
-Sekiz araç, sol kenar çubuğundan ya da ana sayfadaki kartlardan açılır. Her araç ilk tıklamada
-yüklenir (tembel yükleme) ve sekme değişse bile arka plandaki işleri — çıkarım, export,
+Dokuz araç, sol kenar çubuğundan ya da ana sayfadaki kartlardan açılır. Her araç ilk tıklamada
+yüklenir (tembel yükleme) ve sekme değişse bile arka plandaki işleri — çıkarım, eğitim, export,
 kopyalama — çalışmaya devam eder.
 
 ### ✂ Video Kırpıcı — videodan işe yarayan zaman aralıklarını kes
@@ -248,7 +276,35 @@ gruplar, sorunluları karantinaya taşır ve **sahne sızıntısı olmayan** tra
 (yakın kopyaların aynı anda train ve val'e düşmesi başarıyı yapay şişirir — bölme bunu engeller).
 Hiçbir dosya silinmez; her şey karantina klasörüne taşınır, geri alınabilir.
 
+Buradaki **⇉ Veri Setlerini Birleştir** düğmesi birden çok veri setini tek sete indirger. Setler
+arasında sınıf id'leri çakışabilir — birinde `0=kamyon`, ötekinde `0=tır` olabilir; düpedüz üst
+üste kopyalamak etiketleri sessizce bozar, model `kamyon` diye `tır` öğrenir. Diyalogda her
+kaynağın her sınıfının hedefte neye denk geleceği tek tek seçilir; aynı isimliler kendiliğinden
+eşlenir, istemediğin sınıf `(atla)` ile düşürülür (kutusu kalmayan görsel istenirse hiç
+alınmaz), dosya adı çakışması kaynak ön ekiyle çözülür. Çıktı doğrudan denetime yüklenebilir.
+
 ![Veri Denetçi](gorseller/veri_denetci.png)
+
+### ◈ Eğitim — veri setini modele dönüştür
+
+Döngünün kapandığı yer: Veri Denetçi'nin ürettiği `data.yaml` burada eğitilir, çıkan `best.pt`
+Hata Analizi ve Model Karşılaştır'a girer, oradan gelen bilgiyle veri büyür ve **aynı modelin
+üstüne** yeniden eğitilir.
+
+- **Kendi modelinden devam** — başlangıç ağırlığı hazır bir isim (`yolo11n`…) ya da senin
+  herhangi bir `.pt`'n olabilir. İkinci turdan itibaren doğrusu, önceki turun `best.pt`'sini
+  seçmektir; sıfırdan eğitmek öğrenileni atmaktır.
+- **Cihaz seçimi** — Apple donanımında MPS, NVIDIA'da CUDA, ya da CPU.
+- **Erken durdurma, katman dondurma, resume, ara kayıt, optimizer, lr, tohum.**
+- **Canlı eğri** — kayıp (mavi, düz) ve mAP50-95 (kehribar, kesikli) epoch epoch çizilir; son
+  değerler ayrıca sayı olarak yazılır.
+- **Eğitimden önce sızıntı denetimi** — `data.yaml`'daki train ve val bölümleri yakın-kopya için
+  taranır. Ortak sahne bulunursa örnekleriyle söylenir ve eğitim sen onaylamadan başlamaz; bu
+  denetim olmadan şişik bir mAP'ye bakıp modeli iyi sanmak çok kolaydır.
+- **Durdurma** — sıradaki epoch sınırında durur, o ana kadarki en iyi ağırlık diskte kalır.
+
+Eğitim ayrı bir süreçte değil, ayrı bir **iş parçacığında** koşar ve ilerleme stdout ayrıştırarak
+değil ultralytics'in `add_callback`'iyle alınır.
 
 ### ◔ Hata Analizi — model nerede yanılıyor + sırada ne etiketlenmeli
 
@@ -309,11 +365,11 @@ Boxify/
 ├── boxify.py                 # başlatıcı (glib düzeltmesi + dil yamaları + QApplication)
 ├── requirements.txt
 ├── ikon.png                  # uygulama ikonu
-├── kur.sh                    # Linux menü kaydı / kaldırma (boxify.desktop)
+├── kur.sh                    # macOS (Boxify.app) ve Linux (boxify.desktop) kurulumu
 ├── kur.bat / kur.ps1         # Windows masaüstü + Başlat Menüsü kısayolu
 ├── gorseller/                # ekran görüntüleri
 └── boxify/
-    ├── __init__.py           # sürüm bilgisi (3.0.0)
+    ├── __init__.py           # sürüm bilgisi (3.1.0)
     ├── dil.py                # TR/EN dil eklentisi: sözlük + PyQt çeviri yamaları
     ├── tema.py               # ortak açık tema (beyaz + mavi, renk körlüğü dostu)
     ├── klasor_ac.py          # işletim sistemine göre "klasörü aç"
@@ -324,11 +380,15 @@ Boxify/
     └── araclar/
         ├── __init__.py       # araç kaydı (ad, açıklama, ipuçları, modül)
         ├── model_bilgi.py    # model sınıf adlarını arka planda okuyan ortak yardımcı
+        ├── ffmpeg_yardim.py  # ffmpeg denetimi + platforma uygun kurulum ipucu
+        ├── veri_bolme.py     # yakın-kopya gruplama + sızıntısız bölme (tek doğru kaynak)
+        ├── veri_birlestir.py # veri seti birleştirme + sınıf eşleme diyalogu
         ├── video_kirpici.py
         ├── kare_alici.py
         ├── oto_label.py
         ├── labelapp/         # core/ (veri) + ui/ (arayüz) paketi
         ├── veri_denetci.py
+        ├── egitim.py
         ├── hata_analizi.py
         ├── model_karsilastir.py
         └── model_export.py
@@ -372,6 +432,16 @@ tag'e geçebilirsin — bkz. [Sürüm geçmişi](#sürüm-geçmişi).
   atarsa hiçbir sinyal çıkmaz ve arayüz ilerlemeyen bir çubukta asılı kalır. ffmpeg çağıran
   işçiler bu yüzden `Popen`'i her zaman try/except içinde açar ve hatayı `error` sinyaliyle
   bildirir.
+- **Tek bölme kodu:** Yakın-kopya gruplaması ve train/val/test dağıtımı yalnızca
+  `boxify/araclar/veri_bolme.py`'de. Bir zamanlar iki uygulama vardı — Veri Denetçi'ninki gruplu,
+  Labelapp'inki `random.shuffle` — ve eğitim düğmesi yanlış olana bağlıydı. İkinci bir bölme kodu
+  yazılmamalı: bir grubun ikiye ayrılması sessizce şişik bir mAP üretir.
+- **Eğitim metin betiği değil:** Eğitim eskiden Python kaynağını f-string ile kurup `python -c`
+  ile çalıştırıyordu; yolunda tek tırnak olan bir klasör (`Ali'nin kayitlari`) sözdizimi hatası
+  veriyordu. Artık ultralytics doğrudan çağrılıyor, ilerleme de stdout ayrıştırarak değil
+  `add_callback` ile alınıyor. Eğitim bitince ultralytics `best.pt`'yi bir kez daha doğrular ve
+  aynı geri çağrımı tetikler; o tur eğriye ikinci kez nokta koymasın diye numarası toplam
+  epoch'u aştığında elenir.
 - **Tek başına çalıştırma:** Her araç modülü bağımsız da açılabilir:
   `python -m boxify.araclar.veri_denetci` (sürüm klasörünün içinde).
 - **Veri güvenliği:** Hiçbir araç dosya silmez; temizlik daima karantina klasörüne taşımadır.

@@ -216,12 +216,16 @@ class TrainingDialog(QDialog):
             if len(labeled) < 2:
                 self._append(f"⚠  Çok az resim ({len(labeled)}). Val için train resimleri kullanılacak.")
 
-            self._append("Veri seti dışa aktarılıyor...")
+            self._append("Veri seti dışa aktarılıyor (yakın-kopyalar gruplanıyor)...")
             tr  = self.train_sp.value() / 100
             vr  = self.val_sp.value() / 100
             ter = max(0, 100 - self.train_sp.value() - self.val_sp.value()) / 100
             try:
                 yaml_path = self.dataset.export(self._out_dir, tr, vr, ter)
+                grup = getattr(self.dataset, "son_grup_sayisi", 0)
+                if grup:
+                    self._append(f"  → {len(labeled)} görsel, {grup} yakın-kopya grubu; "
+                                 f"aynı grubun kareleri aynı bölüme kondu")
                 self._append(f"dataset.yaml → {yaml_path}")
             except Exception as e:
                 self._append(f"✗ Export hatası: {e}")

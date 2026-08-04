@@ -27,6 +27,9 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal, QRectF, QTimer
 from PyQt5.QtGui import QImage, QPainter, QPen, QColor, QFont
 
 from ..tema import STYLE  # ortak açık tema — bkz. boxify/tema.py
+# Yakın-kopya bulma ve sızıntısız dağıtım tek yerde tutulur; Labelapp'in veri
+# seti dışa aktarımı da aynı modülü kullanır (bkz. veri_bolme.py)
+from .veri_bolme import dhash64, group_duplicates, bolumlere_dagit
 
 IMG_EXTS = (".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff")
 
@@ -169,56 +172,6 @@ def parse_label_file(path: str, nc: int, min_area: float):
     return boxes, errors, warns
 
 
-def dhash64(gray) -> int:
-    """8x8 fark hash'i (dHash) — yakın-kopya karşılaştırması için."""
-    import cv2
-    small = cv2.resize(gray, (9, 8), interpolation=cv2.INTER_AREA)
-    diff = (small[:, 1:] > small[:, :-1]).flatten().astype(np.uint8)
-    return int.from_bytes(np.packbits(diff).tobytes(), "big")
-
-
-def group_duplicates(hashes: list, thresh: int) -> list:
-    """Hamming mesafesi eşiğin altındaki hash'leri gruplar (birleşim-bul).
-
-    Mesafe matrisi BLAS ile hesaplanır: hamming(a,b) = a·(1-b) + (1-a)·b
-    """
-    idx = [i for i, h in enumerate(hashes) if h is not None]
-    if len(idx) < 2:
-        return []
-    arr = np.array([hashes[i] for i in idx], dtype=">u8")
-    bits = np.unpackbits(arr.view(np.uint8).reshape(-1, 8), axis=1)
-    A = bits.astype(np.float32)
-    B = 1.0 - A
-
-    parent = list(range(len(idx)))
-
-    def find(a):
-        while parent[a] != a:
-            parent[a] = parent[parent[a]]
-            a = parent[a]
-        return a
-
-    def union(a, b):
-        ra, rb = find(a), find(b)
-        if ra != rb:
-            parent[rb] = ra
-
-    step = max(64, min(1024, 4_000_000 // max(1, len(idx))))
-    for s in range(0, len(idx), step):
-        e = min(len(idx), s + step)
-        dist = A[s:e] @ B.T + B[s:e] @ A.T          # (e-s) x n
-        for r in range(e - s):
-            i = s + r
-            for j in np.nonzero(dist[r] <= thresh)[0]:
-                if int(j) != i:
-                    union(i, int(j))
-
-    groups = {}
-    for k in range(len(idx)):
-        groups.setdefault(find(k), []).append(idx[k])
-    return [sorted(v) for v in groups.values() if len(v) > 1]
-
-
 def bar(n: int, maxn: int, width: int = 22) -> str:
     filled = int(round(width * n / max(1, maxn)))
     return "█" * filled + "·" * (width - filled)
@@ -335,34 +288,21 @@ class SplitWorker(QThread):
         out_dir = cfg["out_dir"]
         os.makedirs(out_dir, exist_ok=True)
 
-        groups = {}
-        for img, lbl, key in pairs:
-            groups.setdefault(key, []).append((img, lbl))
-        keys = sorted(groups)
-        random.Random(cfg["seed"]).shuffle(keys)
-
         total = len(pairs)
-        targets = {"train": cfg["ratios"][0] * total,
-                   "val": cfg["ratios"][1] * total,
-                   "test": cfg["ratios"][2] * total}
-        buckets = {k: [] for k in targets}
+        # Dağıtımın kendisi veri_bolme'de: aynı grubun kareleri asla ikiye
+        # ayrılmaz (val sızıntısı olmaz), oranlar yine de korunur.
+        kova = bolumlere_dagit([k for _i, _l, k in pairs],
+                               cfg["ratios"], cfg["seed"])
+        buckets = {ad: [(pairs[i][0], pairs[i][1]) for i in idxs]
+                   for ad, idxs in kova.items()}
+        grup_sayisi = len({k for _i, _l, k in pairs})
 
-        # her grubu, hedefine en çok uzak olan bölüme koy → oranlar korunur,
-        # aynı grubun kareleri asla ikiye ayrılmaz (val sızıntısı olmaz)
-        for key in keys:
-            pick = max(
-                (k for k in targets if targets[k] > 0),
-                key=lambda k: targets[k] - len(buckets[k]),
-                default="train",
-            )
-            buckets[pick].extend(groups[key])
-
-        self.log.emit(f"{len(keys)} grup → " + ", ".join(
+        self.log.emit(f"{grup_sayisi} grup → " + ", ".join(
             f"{k}: {len(v)} görsel" for k, v in buckets.items()))
 
         names = cfg["names"]
         report = [f"Bölme (tohum {cfg['seed']}, gruplama: {cfg['group_desc']})",
-                  f"Toplam {total} görsel, {len(keys)} grup", ""]
+                  f"Toplam {total} görsel, {grup_sayisi} grup", ""]
 
         mode = cfg["mode"]
         done_n = 0
@@ -644,6 +584,14 @@ class MainWindow(QMainWindow):
         self.names_lbl.setWordWrap(True)
         self.names_lbl.setStyleSheet("color:#6b7686; font-size:11px;")
         g.addWidget(self.names_lbl)
+
+        self.merge_btn = QPushButton("⇉  Veri Setlerini Birleştir…")
+        self.merge_btn.setToolTip(
+            "Birden çok veri setini tek sete indirger. Sınıf id'leri setler arasında\n"
+            "farklıysa hangisinin neye denk geleceğini tek tek seçersin — üst üste\n"
+            "kopyalamak etiketleri sessizce bozar.")
+        self.merge_btn.clicked.connect(self._birlestir_ac)
+        g.addWidget(self.merge_btn)
         v.addWidget(grp)
 
         # Denetim
@@ -834,6 +782,26 @@ class MainWindow(QMainWindow):
         if not self.split_out_edit.text():
             self.split_out_edit.setText(os.path.join(
                 os.path.dirname(img.rstrip(os.sep)) or img, "split"))
+
+    def _birlestir_ac(self):
+        """Birleştirme diyalogunu aç; kapanınca çıktı klasörünü denetime yükle.
+
+        Modül burada import ediliyor: birleştirme çoğu oturumda hiç açılmıyor,
+        araç açılışını onun için yavaşlatmanın anlamı yok.
+        """
+        from .veri_birlestir import BirlestirDialog
+        d = BirlestirDialog(self)
+        d.exec_()
+        out = d.out_edit.text().strip()
+        img = os.path.join(out, "images")
+        if out and os.path.isdir(img):
+            if QMessageBox.question(
+                    self, "Birleşik seti denetle",
+                    "Birleştirilen veri seti denetime yüklensin mi?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.Yes) == QMessageBox.Yes:
+                self._set_dirs(img, os.path.join(out, "labels"))
+                self.root_edit.setText(out)
 
     def _pick_split_out(self):
         d = QFileDialog.getExistingDirectory(self, "Bölme çıktı klasörü",
