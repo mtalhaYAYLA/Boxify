@@ -6,6 +6,8 @@ QThread işçileri sekme değişince çalışmaya devam eder.
 """
 
 import importlib
+import os
+import sys
 import traceback
 
 from PyQt5.QtWidgets import (
@@ -17,6 +19,7 @@ from PyQt5.QtGui import QPixmap
 
 from . import SURUM
 from .araclar import ARACLAR, arac_bul
+from .dil import tr, aktif_dil, dil_kaydet
 from .sayfalar.anasayfa import AnaSayfa, IKON_YOLU
 from .sayfalar.ipuclari import IpuclariSayfasi
 
@@ -24,7 +27,8 @@ from .sayfalar.ipuclari import IpuclariSayfasi
 class AnaPencere(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(f"Boxify {SURUM} — Nesne Tespiti Veri ve Model Atölyesi")
+        self.setWindowTitle(
+            f"Boxify {SURUM} — " + tr("Nesne Tespiti Veri ve Model Atölyesi"))
         self.resize(1500, 920)
 
         self._sayfa_no = {}      # anahtar -> stack indeksi
@@ -72,7 +76,7 @@ class AnaPencere(QMainWindow):
         ad_kutu.setSpacing(3)
         ad = QLabel("Boxify")
         ad.setObjectName("LogoAd")
-        surum = QLabel(f"sürüm {SURUM}")
+        surum = QLabel(tr("sürüm") + f" {SURUM}")
         surum.setObjectName("Surum")
         surum_kutu = QHBoxLayout()
         surum_kutu.addWidget(surum)
@@ -105,11 +109,58 @@ class AnaPencere(QMainWindow):
 
         dikey.addStretch()
         dikey.addWidget(self._ayrac())
+        dikey.addLayout(self._dil_satiri())
         dip = QLabel("Nesne tespiti için veri seti,\netiketleme ve model atölyesi")
         dip.setObjectName("KenarDip")
         dip.setWordWrap(True)
         dikey.addWidget(dip)
         return cubuk
+
+    # ── Dil (TR/EN) ──────────────────────────────────────────────────────
+    def _dil_satiri(self):
+        """Kenar çubuğu dibindeki TR/EN dil değiştirici."""
+        satir = QHBoxLayout()
+        satir.setContentsMargins(16, 8, 16, 0)
+        satir.setSpacing(6)
+
+        etiket = QLabel(tr("Arayüz dili"))
+        etiket.setObjectName("DilEtiket")
+        satir.addWidget(etiket)
+        satir.addStretch()
+
+        self._dil_dugmeler = {}
+        for kod, yazi in (("tr", "TR"), ("en", "EN")):
+            dugme = QPushButton(yazi)
+            dugme.setObjectName("DilDugme")
+            dugme.setCheckable(True)
+            dugme.setChecked(aktif_dil() == kod)
+            dugme.setFixedWidth(40)
+            dugme.setCursor(Qt.PointingHandCursor)
+            dugme.clicked.connect(lambda _, k=kod: self._dil_degistir(k))
+            self._dil_dugmeler[kod] = dugme
+            satir.addWidget(dugme)
+        return satir
+
+    def _dil_dugme_tazele(self):
+        for kod, dugme in self._dil_dugmeler.items():
+            dugme.setChecked(aktif_dil() == kod)
+
+    def _dil_degistir(self, kod: str):
+        if kod == aktif_dil():
+            self._dil_dugme_tazele()
+            return
+        yanit = QMessageBox.question(
+            self, tr("Dil değişikliği"),
+            tr("Dil değişikliği için uygulama yeniden başlatılacak. "
+               "Devam edilsin mi?"),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+        if yanit != QMessageBox.Yes:
+            self._dil_dugme_tazele()
+            return
+        dil_kaydet(kod)
+        # Araç pencereleri tembel yüklendiği için dilin her yere işlemesinin
+        # tek güvenilir yolu temiz bir başlangıçtır
+        os.execl(sys.executable, sys.executable, *sys.argv)
 
     def _ayrac(self) -> QFrame:
         cizgi = QFrame()
@@ -152,7 +203,7 @@ class AnaPencere(QMainWindow):
 
         self.yigin.setCurrentIndex(self._sayfa_no[anahtar])
         self._nav_dugmeler[anahtar].setChecked(True)
-        self.statusBar().showMessage(f'{arac["ad"]} — {arac["ozet"]}')
+        self.statusBar().showMessage(tr(arac["ad"]) + " — " + tr(arac["ozet"]))
 
     def _arac_yukle(self, arac: dict) -> bool:
         QApplication.setOverrideCursor(Qt.WaitCursor)
@@ -166,8 +217,8 @@ class AnaPencere(QMainWindow):
             QApplication.restoreOverrideCursor()
             QMessageBox.critical(
                 self, f'{arac["ad"]} açılamadı',
-                "Araç yüklenirken hata oluştu (eksik bağımlılık olabilir):\n\n"
-                + traceback.format_exc(limit=6))
+                tr("Araç yüklenirken hata oluştu (eksik bağımlılık olabilir):")
+                + "\n\n" + traceback.format_exc(limit=6))
             return False
         QApplication.restoreOverrideCursor()
 

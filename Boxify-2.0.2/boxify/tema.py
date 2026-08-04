@@ -1,4 +1,4 @@
-"""Boxify ortak teması — açık (light) tema, sürüm 2.0.1.
+"""Boxify ortak teması — açık (light) tema, sürüm 2.0.2.
 
 Tasarım dili (göz yormayan, düşük parlamalı):
 - Sayfa zemini yumuşak gri (#EFF1F5); kart/girdi zeminleri kırık beyaz
@@ -271,6 +271,22 @@ QDialog {{ background-color: {ARKA}; }}
     font-weight: bold;
 }}
 #KenarDip {{ color: #76818f; font-size: 10px; padding: 10px 18px; }}
+#DilEtiket {{ color: #76818f; font-size: 10px; letter-spacing: 1px; }}
+#DilDugme {{
+    background-color: transparent;
+    border: 1px solid {KENARLIK_K};
+    border-radius: 6px;
+    color: #4d5765;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 3px 0;
+}}
+#DilDugme:hover {{ background-color: #c4ccd6; color: {METIN}; }}
+#DilDugme:checked {{
+    background-color: {MAVI};
+    border-color: {MAVI};
+    color: #f5f8fb;
+}}
 
 /* ── Ana sayfa kartları ────────────────────────────────────────────────── */
 #Kart {{

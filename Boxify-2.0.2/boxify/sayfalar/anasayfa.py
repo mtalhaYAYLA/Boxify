@@ -11,6 +11,7 @@ from PyQt5.QtGui import QPixmap
 
 from .. import SURUM
 from ..araclar import ARACLAR
+from ..dil import tr
 
 IKON_YOLU = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
@@ -95,9 +96,10 @@ class AnaSayfa(QScrollArea):
         baslik = QLabel("Boxify")
         baslik.setObjectName("AnaBaslik")
         alt = QLabel(
-            f"Nesne tespiti için veri seti ve model atölyesi — sürüm {SURUM}\n"
-            "Hangi nesneyle çalışırsan çalış — balon, araç, ürün, kusur — "
-            "videodan hazır modele giden her adım tek çatı altında."
+            tr("Nesne tespiti için veri seti ve model atölyesi")
+            + f" — {tr('sürüm')} {SURUM}\n"
+            + tr("Hangi nesneyle çalışırsan çalış — balon, araç, ürün, kusur — "
+                 "videodan hazır modele giden her adım tek çatı altında.")
         )
         alt.setObjectName("AnaAltBaslik")
         alt.setWordWrap(True)

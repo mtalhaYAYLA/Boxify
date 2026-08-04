@@ -54,6 +54,13 @@ from PyQt5.QtWidgets import QApplication          # noqa: E402
 from PyQt5.QtGui import QIcon                     # noqa: E402
 
 from boxify import SURUM                          # noqa: E402
+from boxify import dil                            # noqa: E402
+
+# Dil yamaları her pencereden önce kurulmalı (İngilizce modda Qt metin
+# API'leri çeviri süzgecinden geçirilir; Türkçede hiçbir şey değişmez)
+dil.dil_yukle()
+dil.yamalari_kur()
+
 from boxify.tema import STYLE                     # noqa: E402
 from boxify.ana_pencere import AnaPencere         # noqa: E402
 

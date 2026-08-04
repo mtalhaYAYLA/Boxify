@@ -1,32 +1,40 @@
-# Boxify 2.0.1 — Açık Tema ve Ürünleştirme
+# Boxify 2.0.2 — TR/EN Dil Desteği (güncel sürüm)
 
 Nesne tespit modeli üretmenin yedi aracı **tek uygulamada**: videodan kare çıkarma, oto/elle
 etiketleme, veri denetimi, hata analizi ve model export. Belirli bir alana bağlı değildir —
 balon, araç, ürün, kusur… hangi nesneyi tanımlamak istersen aynı akış geçerlidir.
 
-![Ana sayfa](gorseller/anasayfa.png)
+Sol kenar çubuğundan araçlar arasında geçilir; her araç ilk tıklamada yüklenir ve sekme değişse
+bile arka plandaki işleri (çıkarım, export, kopyalama…) çalışmaya devam eder.
 
-## 2.0.0'dan neler değişti
+| Türkçe | English |
+|---|---|
+| ![TR](gorseller/anasayfa.png) | ![EN](gorseller/anasayfa_en.png) |
 
-- **Açık tema:** Koyu gri kabuk bırakıldı; beyaz zemin + mavi vurgu, yenilenen yazı tipleri,
-  buton/hover efektleri ve kartlar. Görüntü/video tuvalleri kasıtlı olarak koyu kaldı — kutu
-  renkleri koyu zeminde daha iyi seçilir.
-- **İpuçları sayfası:** Genel akışın nasıl işlediği ve her aracın püf noktaları artık uygulamanın
-  içinde anlatılıyor (`boxify/sayfalar/ipuclari.py`); araç kaydına her araç için `ipuclari`
-  listesi eklendi.
-- **Zincir kaldırıldı:** Araçlar "1→2→3…" numaralı bir hat gibi değil, ihtiyaca göre kullanılan
-  bağımsız araçlar olarak sunuluyor; kenar çubuğundaki adım numaraları ve ana sayfadaki zincir
-  şeridi gitti.
-- **Alan-bağımsız metinler:** Üretim hattına özgü ifadeler genelleştirildi; uygulama artık hangi
-  nesne türü olursa olsun aynı dille konuşuyor.
+## 2.0.1'den neler değişti
 
-İpuçları sayfası:
+- **TR/EN arayüz dili:** Kenar çubuğunun dibindeki TR/EN düğmeleriyle dil değiştirilir; seçim
+  `~/.config/boxify4/ayarlar.json` dosyasına kaydedilir ve onay sonrası uygulama yeniden
+  başlatılarak uygulanır (araçlar tembel yüklendiği için dilin her yere işlemesinin tek güvenilir
+  yolu temiz bir başlangıçtır).
+- **Dil desteği eklenti olarak eklendi** (`boxify/dil.py`): araç modüllerinin koduna dokunulmadı.
+  İngilizce seçiliyken PyQt metin API'leri (QLabel/QPushButton kurucuları, `setText`,
+  `setToolTip`, QMessageBox/QFileDialog statikleri…) monkey-patch ile `tr()` çeviri süzgecinden
+  geçirilir; sözlükte olmayan metin (dosya yolu, sınıf adı, bazı anlık log satırları) olduğu gibi
+  Türkçe kalır. Türkçe moddayken hiçbir yama kurulmaz.
+- **Çeviri iki katmanlıdır:** `SOZLUK` (~376 birebir TR→EN kayıt) + `KALIPLAR` (regex şablonları —
+  "N görsel", "Kaydedildi: X" gibi çalışma anında üretilen metinler; yakalanan gruplar `tr()`'den
+  yeniden geçer).
+- **Yeni dil eklemek kolay:** `boxify/dil.py` içindeki `SOZLUK`/`KALIPLAR` yapısına yeni bir
+  sözlük eklemek ve `DILLER`'i genişletmek yeterlidir.
 
-![İpuçları](gorseller/ipuclari.png)
+İpuçları sayfası iki dilde:
+
+| Türkçe | English |
+|---|---|
+| ![TR](gorseller/ipuclari.png) | ![EN](gorseller/ipuclari_en.png) |
 
 ## Araçlar
-
-Hepsi yeni açık temada:
 
 ### ✂ Video Kırpıcı
 
@@ -48,8 +56,7 @@ Mevcut YOLO modeliyle kareleri tarayıp YOLO txt ön etiketleri üretir.
 
 ### ✎ Labelapp
 
-Ön etiketleri elle düzeltme, eksik kutuları çizme ve sınıf atama arayüzü. Görüntü tuvali
-kasıtlı olarak koyu kalır — kutu renkleri koyu zeminde daha iyi seçilir.
+Ön etiketleri elle düzeltme, eksik kutuları çizme ve sınıf atama arayüzü.
 
 ![Labelapp](gorseller/labelapp.png)
 
@@ -81,17 +88,20 @@ python boxify.py
 
 **Windows'ta:** Uygulama platform bağımsızdır, aynı adımlar PowerShell/cmd'de de çalışır. Ayrıca
 **ffmpeg**'i [ffmpeg.org](https://ffmpeg.org/download.html)'dan indirip PATH'e eklemen gerekir
-(Video Kırpıcı ve Kare Alıcı bunu kullanır). "Çıktı klasörünü aç" düğmeleri işletim sistemine göre
-doğru komutu kendisi seçer (Windows'ta `os.startfile`, Linux'ta `xdg-open`).
+(Video Kırpıcı ve Kare Alıcı bunu kullanır).
 
 ## Uygulama menüsüne kaydetme (Linux)
 
 ```bash
-./kur.sh          # menüye ekler
+./kur.sh          # menüye "Boxify" olarak ekler (boxify.desktop)
 ./kur.sh kaldir   # menüden çıkarır
 ```
 
-`kur.sh`, PyQt5 içeren ilk python'u otomatik seçer; diğer sürümlerin menü kayıtlarına dokunmaz.
+`kur.sh`, PyQt5 içeren ilk python'u otomatik seçer, ikonu 512×512 kare yapıp hicolor temasına
+kurar. Klasörün adı ya da yeri değişirse `kur.sh`'ı bir kez daha çalıştırmak yeterlidir —
+kısayolu yeni yola göre kendisi yeniden yazar.
+
+![Kurulum terminali](gorseller/kurulum_terminal.png)
 
 ## Masaüstü + Başlat Menüsü kısayolu (Windows)
 
@@ -105,17 +115,18 @@ doğru komutu kendisi seçer (Windows'ta `os.startfile`, Linux'ta `xdg-open`).
 ## Dizin yapısı
 
 ```
-Boxify-2.0.1/
-├── boxify.py                 # başlatıcı (glib düzeltmesi + QApplication)
+Boxify-2.0.2/
+├── boxify.py                 # başlatıcı (glib düzeltmesi + dil yamaları + QApplication)
 ├── ikon.png                  # uygulama ikonu
-├── kur.sh                    # Linux menü kaydı / kaldırma
+├── kur.sh                    # Linux menü kaydı / kaldırma (boxify.desktop)
 ├── kur.bat / kur.ps1         # Windows masaüstü + Başlat Menüsü kısayolu
 ├── requirements.txt
 ├── gorseller/                # ekran görüntüleri
 └── boxify/
-    ├── __init__.py           # sürüm bilgisi (2.0.1)
+    ├── __init__.py           # sürüm bilgisi (2.0.2)
+    ├── dil.py                # dil eklentisi: TR/EN sözlük + PyQt çeviri yamaları
     ├── tema.py               # ortak açık tema (beyaz + mavi, renk körlüğü dostu)
-    ├── ana_pencere.py        # kabuk: kenar çubuğu + sayfa yığını
+    ├── ana_pencere.py        # kabuk: kenar çubuğu + sayfa yığını + dil değiştirici
     ├── sayfalar/
     │   ├── anasayfa.py       # kartlı karşılama panosu
     │   └── ipuclari.py       # genel akış + araç bazlı ipuçları
@@ -133,13 +144,11 @@ Boxify-2.0.1/
 ## Notlar
 
 - Her araç modülü **tek başına da çalışır**:
-  `python -m boxify.araclar.veri_denetci` (bu dizinde).
+  `python -m boxify.araclar.veri_denetci` (bu dizinde). Tek başına çalıştırmada arayüz TR kalır.
 - GStreamer "missing a plug-in" düzeltmesi başlatıcıda otomatik uygulanır;
   kapatmak için `VK_NO_GLIB_FIX=1`.
 - Hiçbir araç dosya silmez; temizlik daima karantinaya taşımadır.
 - Tema kırmızı-yeşil ayrımına dayanmaz: vurgular mavi (ikincil olarak koyu metinli kehribar),
   durumlar ayrıca metin ve çizgi deseniyle verilir.
-
-## Sonraki sürüm
-
-[Boxify-2.0.2](../Boxify-2.0.2/)'de arayüze TR/EN dil desteği eklendi.
+- Görüntü/video tuvalleri kasıtlı olarak koyu kalır (kutu renkleri üzerinde daha iyi seçilir);
+  uygulama kabuğu açık temadır.

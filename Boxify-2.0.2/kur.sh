@@ -5,8 +5,8 @@
 set -euo pipefail
 
 DIZIN="$(cd "$(dirname "$0")" && pwd)"
-MASAUSTU_DOSYA="$HOME/.local/share/applications/boxify3.desktop"
-IKON_HEDEF="$HOME/.local/share/icons/hicolor/512x512/apps/boxify3.png"
+MASAUSTU_DOSYA="$HOME/.local/share/applications/boxify.desktop"
+IKON_HEDEF="$HOME/.local/share/icons/hicolor/512x512/apps/boxify.png"
 
 if [[ "${1:-}" == "kaldir" ]]; then
     rm -f "$MASAUSTU_DOSYA" "$IKON_HEDEF"
@@ -54,12 +54,12 @@ mkdir -p "$(dirname "$MASAUSTU_DOSYA")"
 cat > "$MASAUSTU_DOSYA" <<EOF
 [Desktop Entry]
 Type=Application
-Name=Boxify 3
+Name=Boxify
 GenericName=Nesne Tespiti Veri ve Model Atölyesi
-Comment=Video kırpma, kare alma, oto/elle etiketleme, veri denetimi, hata analizi ve model export — tek uygulama
-Exec=$PY $DIZIN/boxify.py
+Comment=Video kırpma, kare alma, oto/elle etiketleme, veri denetimi, hata analizi ve model export — tek uygulama (TR/EN)
+Exec="$PY" "$DIZIN/boxify.py"
 Path=$DIZIN
-Icon=boxify3
+Icon=boxify
 Terminal=false
 Categories=Development;Graphics;Science;
 Keywords=yolo;etiket;label;dataset;export;boxify;
