@@ -47,8 +47,8 @@ conda activate boxify
 pip install -r requirements.txt
 ```
 
-PyQt5 + ultralytics içeren bir ortamın zaten varsa (ör. `a1b2`), doğrudan onu aktive edip
-devam edebilirsin — `pip install` adımı gerekmez.
+PyQt5 + ultralytics içeren bir ortamın zaten varsa doğrudan onu aktive edip devam edebilirsin —
+`pip install` adımı gerekmez.
 
 ### 2) Uygulamayı çalıştır
 
@@ -72,10 +72,9 @@ Dikkat edilecekler:
 
 - **ffmpeg** Windows'ta otomatik gelmez; [ffmpeg.org](https://ffmpeg.org/download.html)'dan indirip
   PATH'e eklemen gerekir (Video Kırpıcı ve Kare Alıcı bunu kullanır).
-- **Masaüstü/Başlat Menüsü kısayolu:** `kur.sh` Linux'a özeldir; Windows'ta karşılığı `kur.bat`'tır
-  — çalıştırınca `ikon.png`'yi otomatik `.ico`'ya çevirip masaüstüne ve Başlat Menüsü'ne ikonlu bir
-  kısayol ekler (`kur.bat kaldir` ile kaldırılır). PyQt5 içeren bir `python`'un PATH'te olması
-  yeterli.
+- **Masaüstü/Başlat Menüsü kısayolu:** `kur.sh` macOS ve Linux içindir; Windows'ta karşılığı
+  `kur.bat`'tır — çalıştırınca `ikon.png`'yi otomatik `.ico`'ya çevirip masaüstüne ve Başlat
+  Menüsü'ne ikonlu bir kısayol ekler (`kur.bat kaldir` ile kaldırılır).
 - Araçlardaki "çıktı klasörünü aç" butonları `boxify/klasor_ac.py` üzerinden işletim sistemine göre
   doğru komutu seçer (Windows'ta `os.startfile`, macOS'ta `open`, Linux'ta `xdg-open`) — ek bir
   ayar gerekmez.
@@ -143,9 +142,9 @@ git checkout main        # güncele dön
 | [`v2.0.1`](../../releases/tag/v2.0.1) | Ürünleştirme: **açık beyaz-mavi tema**, İpuçları sayfası, zincir/adım numaraları kaldırıldı, metinler alan-bağımsız hâle getirildi |
 | [`v2.0.2`](../../releases/tag/v2.0.2) | **TR/EN arayüz dili**: çeviri, araç kodlarına dokunmayan bir dil eklentisiyle (`dil.py`) yapıldı |
 | [`v3.0.0`](../../releases/tag/v3.0.0) | **⚖ Model Karşılaştır** (sekizinci araç) + arayüz akıcılığı düzeltmeleri; depo tek kod tabanına düzleştirildi |
-| [`v3.1.0`](../../releases/tag/v3.1.0) | **◈ Eğitim** (dokuzuncu araç) + veri seti birleştirme/sınıf eşleme + sızıntılı bölme hatasının düzeltilmesi + platforma göre kurulum — **güncel sürüm** |
+| [`v4.0.0`](../../releases/tag/v4.0.0) | **Döngü uygulamanın içinde kapandı:** ◈ Eğitim (dokuzuncu araç) + ⇉ veri seti birleştirme/sınıf eşleme + sızıntılı bölme hatasının düzeltilmesi + platforma göre kurulum (macOS `.app`) — **güncel sürüm** |
 
-### 3.1.0'da neler değişti
+### 4.0.0'da neler değişti
 
 - **◈ Eğitim — dokuzuncu araç.** Döngünün kapandığı yer. Eğitim daha önce Labelapp'in içinde bir
   diyalogdu ve yalnızca hazır ağırlıklardan (`yolo11m` gibi) başlayabiliyordu; **kendi `best.pt`'nin
@@ -285,6 +284,12 @@ alınmaz), dosya adı çakışması kaynak ön ekiyle çözülür. Çıktı doğ
 
 ![Veri Denetçi](gorseller/veri_denetci.png)
 
+Aşağıda tam olarak o tehlikeli durum var: `saha_2024`'te `1 = tir`, `saha_2025`'te `0 = tir`.
+Aynı sayı iki sette farklı anlama geliyor; eşleme tablosu ikisini de hedefteki tek `tir` sınıfına
+bağlıyor.
+
+![Veri Setlerini Birleştir](gorseller/veri_birlestir.png)
+
 ### ◈ Eğitim — veri setini modele dönüştür
 
 Döngünün kapandığı yer: Veri Denetçi'nin ürettiği `data.yaml` burada eğitilir, çıkan `best.pt`
@@ -305,6 +310,8 @@ Hata Analizi ve Model Karşılaştır'a girer, oradan gelen bilgiyle veri büyü
 
 Eğitim ayrı bir süreçte değil, ayrı bir **iş parçacığında** koşar ve ilerleme stdout ayrıştırarak
 değil ultralytics'in `add_callback`'iyle alınır.
+
+![Eğitim](gorseller/egitim.png)
 
 ### ◔ Hata Analizi — model nerede yanılıyor + sırada ne etiketlenmeli
 
@@ -331,6 +338,8 @@ kıyaslamak yanıltıcı olabilir" uyarısını da basar. Tek model seçilirse �
 o modelin video üzerindeki davranış dökümüdür.
 
 > Hız rakamları kabaca fikir verir; kesin ölçüm için Model Export'taki Hız Ölçümü'nü kullan.
+
+![Model Karşılaştır](gorseller/model_karsilastir.png)
 
 ### ⇥ Model Export — dağıtım biçimine çevir, hız ve sapmayı ölç
 
@@ -369,7 +378,7 @@ Boxify/
 ├── kur.bat / kur.ps1         # Windows masaüstü + Başlat Menüsü kısayolu
 ├── gorseller/                # ekran görüntüleri
 └── boxify/
-    ├── __init__.py           # sürüm bilgisi (3.1.0)
+    ├── __init__.py           # sürüm bilgisi (4.0.0)
     ├── dil.py                # TR/EN dil eklentisi: sözlük + PyQt çeviri yamaları
     ├── tema.py               # ortak açık tema (beyaz + mavi, renk körlüğü dostu)
     ├── klasor_ac.py          # işletim sistemine göre "klasörü aç"

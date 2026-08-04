@@ -15,5 +15,8 @@ __pycache__/
 *.mp4
 runs/
 
+# Yerel model/veri klasörü (kişisel içerik, depoya girmez)
+modeller/
+
 # Yerel sanal ortam
 .venv/

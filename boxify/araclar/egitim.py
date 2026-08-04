@@ -608,10 +608,18 @@ class MainWindow(QMainWindow):
         kaydir.setWidget(ic)
         dis.addWidget(kaydir, 1)
 
-        # sabit şerit — iş bitince aranmasın
+        # Sabit şerit — kaydırılan ayarların altında kalmayan, hep görünen bölüm.
+        # Üstüne ince bir çizgi konuyor: çizgi olmadan şerit, kaydırma alanının
+        # yarım görünen son satırının devamı gibi okunuyor.
+        ayirici = QFrame()
+        ayirici.setFrameShape(QFrame.HLine)
+        ayirici.setStyleSheet("color:#d4dae2;")
+        dis.addWidget(ayirici)
+
         serit = QWidget()
+        serit.setStyleSheet("background:#f2f5f8;")
         sv = QVBoxLayout(serit)
-        sv.setContentsMargins(6, 6, 6, 6)
+        sv.setContentsMargins(8, 8, 8, 8)
         sv.setSpacing(6)
 
         sv.addWidget(QLabel("Çıktı klasörü"))

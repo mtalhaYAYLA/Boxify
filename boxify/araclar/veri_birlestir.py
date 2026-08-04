@@ -219,7 +219,7 @@ class BirlestirDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Veri Setlerini Birleştir — sınıf eşlemeli")
-        self.resize(1060, 720)
+        self.resize(1080, 800)
         self.setMinimumSize(820, 560)
         self._kaynaklar = []        # [{ad, img_dir, lbl_dir, names, gorseller}]
         self._hedef_adlar = []
@@ -248,6 +248,9 @@ class BirlestirDialog(QDialog):
         self.kaynak_tablo.setHorizontalHeaderLabels(
             ["Ad (dosya ön eki)", "Görsel klasörü", "Görsel", "Sınıf"])
         self.kaynak_tablo.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        # Başlık kendi genişliğinden dar kalırsa kesiliyor ("Ad (dosya ön e…")
+        self.kaynak_tablo.setColumnWidth(0, 150)
+        self.kaynak_tablo.horizontalHeader().setMinimumSectionSize(64)
         self.kaynak_tablo.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.kaynak_tablo.setEditTriggers(QAbstractItemView.DoubleClicked
                                           | QAbstractItemView.EditKeyPressed)
@@ -256,9 +259,11 @@ class BirlestirDialog(QDialog):
 
         h1 = QHBoxLayout()
         b_ekle = QPushButton("+ Veri Seti Ekle…")
+        b_ekle.setMinimumWidth(170)      # kalın yazı dar düğmede kırpılıyor
         b_ekle.clicked.connect(self._kaynak_ekle)
         h1.addWidget(b_ekle)
         b_sil = QPushButton("Seçileni Kaldır")
+        b_sil.setMinimumWidth(140)
         b_sil.clicked.connect(self._kaynak_sil)
         h1.addWidget(b_sil)
         h1.addStretch()
@@ -276,7 +281,7 @@ class BirlestirDialog(QDialog):
             ["Kaynak", "Kaynak sınıfı", "id", "Hedef sınıfı"])
         self.esleme_tablo.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
         self.esleme_tablo.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.esleme_tablo.setMinimumHeight(160)
+        self.esleme_tablo.setMinimumHeight(240)
         v2.addWidget(self.esleme_tablo)
 
         h2 = QHBoxLayout()
@@ -291,7 +296,11 @@ class BirlestirDialog(QDialog):
         h2.addWidget(b_oto)
         v2.addLayout(h2)
         sp.addWidget(g2)
-        sp.setSizes([200, 300])
+        # Eşleme tablosu kaynak sayısı × sınıf sayısı kadar satır tutar, yani
+        # kaynak listesinden hep uzundur; alanın büyük kısmı ona verilir.
+        sp.setSizes([210, 430])
+        sp.setStretchFactor(0, 0)
+        sp.setStretchFactor(1, 1)
         v.addWidget(sp, 1)
 
         # ── çıktı
@@ -326,7 +335,7 @@ class BirlestirDialog(QDialog):
         self.log_box = QTextEdit()
         self.log_box.setReadOnly(True)
         self.log_box.setStyleSheet("font-family:monospace; font-size:11px;")
-        self.log_box.setMaximumHeight(150)
+        self.log_box.setMaximumHeight(110)
         v.addWidget(self.log_box)
 
         h5 = QHBoxLayout()
