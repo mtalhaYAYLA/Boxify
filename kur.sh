@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
-# Boxify'ı işletim sisteminin uygulama listesine kaydeder.
+# Boxify kurulumu.
 #
-#   ./kur.sh          — kur
-#   ./kur.sh kaldir   — kaldır
+#   ./kur.sh              — uygulamayı sistemin uygulama listesine kaydet
+#   ./kur.sh ortam        — Python ortamını kur (conda varsa conda, yoksa venv)
+#   ./kur.sh ortam venv   — ortamı zorla venv ile kur
+#   ./kur.sh ortam conda  — ortamı zorla conda ile kur
+#   ./kur.sh tam          — önce ortam, sonra uygulama kaydı
+#   ./kur.sh kaldir       — uygulama kaydını geri al
 #
 # macOS  : ~/Applications/Boxify.app paketi üretir (Spotlight ve Launchpad görür,
 #          Dock'a sabitlenebilir).
@@ -13,6 +17,99 @@ set -euo pipefail
 
 DIZIN="$(cd "$(dirname "$0")" && pwd)"
 ISLEM="${1:-kur}"
+SECENEK="${2:-}"
+ORTAM_ADI="${BOXIFY_ENV:-boxify}"
+PY_SURUM="${BOXIFY_PY:-3.11}"
+
+
+# ── Ortam kurulumu ───────────────────────────────────────────────────────────
+# conda öncelikli: ultralytics/torch gibi paketlerin ikili bağımlılıklarını
+# (özellikle CUDA'lı kurulumlarda) conda daha temiz çözüyor. conda yoksa
+# aynı işi venv yapar; ikisi de aynı requirements.txt'i kurar.
+conda_bul() {
+    if command -v conda >/dev/null 2>&1; then
+        command -v conda
+        return 0
+    fi
+    local aday
+    for aday in "$HOME/anaconda3/bin/conda" "$HOME/miniconda3/bin/conda" \
+                "$HOME/miniforge3/bin/conda" "/opt/anaconda3/bin/conda" \
+                "/opt/miniconda3/bin/conda" \
+                "/opt/homebrew/Caskroom/miniforge/base/bin/conda"; do
+        [[ -x "$aday" ]] && { printf '%s' "$aday"; return 0; }
+    done
+    return 1
+}
+
+ortam_conda() {
+    local CONDA
+    CONDA="$(conda_bul)" || return 1
+    echo "conda: $CONDA"
+    local KOK PY
+    KOK="$("$CONDA" info --base)"
+    PY="$KOK/envs/$ORTAM_ADI/bin/python"
+
+    if [[ -x "$PY" ]]; then
+        echo "Ortam zaten var: $ORTAM_ADI"
+    else
+        echo "conda ortamı oluşturuluyor: $ORTAM_ADI (python $PY_SURUM)"
+        "$CONDA" create -y -n "$ORTAM_ADI" "python=$PY_SURUM" || return 1
+    fi
+    [[ -x "$PY" ]] || { echo "HATA: ortam oluştu ama python bulunamadı: $PY" >&2; return 1; }
+
+    echo "Bağımlılıklar kuruluyor…"
+    "$PY" -m pip install --upgrade pip >/dev/null
+    "$PY" -m pip install -r "$DIZIN/requirements.txt" || return 1
+
+    echo
+    echo "Tamam: conda ortamı hazır → $ORTAM_ADI"
+    echo "  Elle kullanmak için:  conda activate $ORTAM_ADI && python \"$DIZIN/boxify.py\""
+    printf '%s' "$PY" > "$DIZIN/.boxify_python"
+    return 0
+}
+
+ortam_venv() {
+    local VENV="$DIZIN/.venv"
+    local PY="$VENV/bin/python"
+    if [[ ! -x "$PY" ]]; then
+        local TABAN
+        TABAN="$(command -v python3 || command -v python || true)"
+        [[ -n "$TABAN" ]] || { echo "HATA: python3 bulunamadı." >&2; return 1; }
+        echo "venv oluşturuluyor: $VENV"
+        "$TABAN" -m venv "$VENV" || return 1
+    else
+        echo "venv zaten var: $VENV"
+    fi
+    echo "Bağımlılıklar kuruluyor…"
+    "$PY" -m pip install --upgrade pip >/dev/null
+    "$PY" -m pip install -r "$DIZIN/requirements.txt" || return 1
+    echo
+    echo "Tamam: venv hazır → $VENV"
+    echo "  Elle kullanmak için:  source \"$VENV/bin/activate\" && python \"$DIZIN/boxify.py\""
+    printf '%s' "$PY" > "$DIZIN/.boxify_python"
+    return 0
+}
+
+ortam_kur() {
+    case "$SECENEK" in
+        conda)
+            ortam_conda || { echo "HATA: conda ile kurulum başarısız." >&2; exit 1; } ;;
+        venv)
+            ortam_venv || { echo "HATA: venv ile kurulum başarısız." >&2; exit 1; } ;;
+        "")
+            if conda_bul >/dev/null 2>&1; then
+                echo "conda bulundu, onunla kuruluyor (venv istersen: ./kur.sh ortam venv)"
+                ortam_conda || { echo "conda başarısız, venv deneniyor…"; ortam_venv; }
+            else
+                echo "conda yok, venv ile kuruluyor"
+                ortam_venv || exit 1
+            fi ;;
+        *)
+            echo "Bilinmeyen seçenek: $SECENEK (conda | venv)" >&2; exit 1 ;;
+    esac
+    echo
+    echo "Sırada: ./kur.sh   — uygulamayı uygulama listesine kaydeder"
+}
 
 # ── Python bul ───────────────────────────────────────────────────────────────
 # Sıra: BOXIFY_PYTHON > o an etkin ortam > venv > conda ortamları > sistem.
@@ -27,6 +124,9 @@ ISLEM="${1:-kur}"
 # turda PyQt5 yeterli sayılır, ama kullanıcı uyarılır.
 adaylari_listele() {
     [[ -n "${BOXIFY_PYTHON:-}" ]] && echo "$BOXIFY_PYTHON"
+    # './kur.sh ortam' kurduğu yorumlayıcıyı buraya yazar; kurulumun hemen
+    # ardından uygulama kaydı yapılırken doğru ortam kendiliğinden seçilsin
+    [[ -f "$DIZIN/.boxify_python" ]] && cat "$DIZIN/.boxify_python"
     [[ -n "${VIRTUAL_ENV:-}" ]] && echo "$VIRTUAL_ENV/bin/python"
     echo "$DIZIN/.venv/bin/python"
     [[ -n "${CONDA_PREFIX:-}" ]] && echo "$CONDA_PREFIX/bin/python"
@@ -115,8 +215,8 @@ EOF
     <key>CFBundleName</key>              <string>Boxify</string>
     <key>CFBundleDisplayName</key>       <string>Boxify</string>
     <key>CFBundleIdentifier</key>        <string>com.boxify.app</string>
-    <key>CFBundleVersion</key>           <string>4.1.0</string>
-    <key>CFBundleShortVersionString</key><string>4.1.0</string>
+    <key>CFBundleVersion</key>           <string>4.2.0</string>
+    <key>CFBundleShortVersionString</key><string>4.2.0</string>
     <key>CFBundlePackageType</key>       <string>APPL</string>
     <key>CFBundleExecutable</key>        <string>Boxify</string>
     <key>CFBundleIconFile</key>          <string>boxify</string>
@@ -225,6 +325,16 @@ EOF
     echo "Tamam: Boxify uygulama menüsüne kaydedildi → $MASAUSTU_DOSYA"
     echo "Menüde görünmezse oturumu yenilemen yeterli."
 }
+
+if [[ "$ISLEM" == "ortam" ]]; then
+    ortam_kur
+    exit 0
+fi
+if [[ "$ISLEM" == "tam" ]]; then
+    ortam_kur
+    echo
+    ISLEM="kur"
+fi
 
 case "$(uname -s)" in
     Darwin) mac_kur ;;

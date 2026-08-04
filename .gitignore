@@ -20,3 +20,4 @@ modeller/
 
 # Yerel sanal ortam
 .venv/
+.boxify_python

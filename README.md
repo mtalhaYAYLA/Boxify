@@ -53,13 +53,14 @@ ffmpeg bir Python paketi değil, sistem paketidir; `pip` onu kuramaz:
 ffmpeg yoksa uygulama açılır ve diğer yedi araç normal çalışır; bu iki araç kendi düğmesini
 kapatıp durum çubuğunda **platformuna uygun** kurulum komutunu gösterir.
 
-#### (İsteğe bağlı) conda ile kurulum
+#### conda ile kurulum (önerilen)
 
-Zaten conda kullanıyorsan aynı işi bir conda ortamıyla da yapabilirsin — komutlar üç sistemde
-de aynıdır:
+`ultralytics` ve `torch` gibi paketlerin ikili bağımlılıklarını — özellikle CUDA'lı
+kurulumlarda — conda daha temiz çözer. Zaten conda kullanıyorsan bunu tercih et; komutlar üç
+sistemde de aynıdır:
 
 ```bash
-conda create -n boxify python=3.10
+conda create -n boxify python=3.11
 conda activate boxify
 pip install -r requirements.txt
 ```
@@ -100,6 +101,25 @@ Birkaç ayrıntı:
 - **GStreamer/glib düzeltmesi:** yalnızca Linux'ta anlamlıdır (conda glib'i ile sistem
   eklentileri çakışınca oynatıcı hiç açılmaz). `boxify/gstreamer_yardim.py` bunu Linux'ta
   otomatik uygular, diğer sistemlerde hiçbir şey yapmaz. Kapatmak için `VK_NO_GLIB_FIX=1`.
+
+> **Kısayol:** Bu adımı elle yapmak yerine kurulum betiğine de yaptırabilirsin —
+> conda varsa onu tercih eder:
+>
+> ```bash
+> ./kur.sh ortam          # macOS / Linux  (conda varsa conda, yoksa venv)
+> ./kur.sh ortam conda    # zorla conda
+> ./kur.sh ortam venv     # zorla venv
+> ```
+> ```powershell
+> .\kur.bat ortam         # Windows
+> ```
+>
+> Ortam adı varsayılan olarak `boxify`, Python sürümü `3.11`; değiştirmek için
+> `BOXIFY_ENV` ve `BOXIFY_PY` ortam değişkenlerini kullan. Betik ortamı kurduktan
+> sonra hangi yorumlayıcıyı kurduğunu `.boxify_python` dosyasına yazar, böylece
+> bir sonraki adımdaki uygulama kaydı doğru ortamı kendiliğinden bulur.
+>
+> Ortam + uygulama kaydını tek komutta yapmak için: `./kur.sh tam` (`kur.bat tam`).
 
 ### 3) (İsteğe bağlı) Uygulama listesine ekle
 
@@ -171,7 +191,19 @@ git checkout main        # güncele dön
 | [`v2.0.2`](../../releases/tag/v2.0.2) | **TR/EN arayüz dili**: çeviri, araç kodlarına dokunmayan bir dil eklentisiyle (`dil.py`) yapıldı |
 | [`v3.0.0`](../../releases/tag/v3.0.0) | **⚖ Model Karşılaştır** (sekizinci araç) + arayüz akıcılığı düzeltmeleri; depo tek kod tabanına düzleştirildi |
 | [`v4.0.0`](../../releases/tag/v4.0.0) | **Döngü uygulamanın içinde kapandı:** ◈ Eğitim (dokuzuncu araç) + ⇉ veri seti birleştirme/sınıf eşleme + sızıntılı bölme hatasının düzeltilmesi + platforma göre kurulum (macOS `.app`) |
-| [`v4.1.0`](../../releases/tag/v4.1.0) | **☀/☾ Açık ve koyu tema** + platform desteğinin macOS/Linux/Windows'ta eşitlenmesi (GStreamer düzeltmesi ARM Linux'ta da çalışıyor) — **güncel sürüm** |
+| [`v4.1.0`](../../releases/tag/v4.1.0) | **☀/☾ Açık ve koyu tema** + platform desteğinin macOS/Linux/Windows'ta eşitlenmesi (GStreamer düzeltmesi ARM Linux'ta da çalışıyor) |
+| [`v4.2.0`](../../releases/tag/v4.2.0) | **Yol hafızası** (33 diyalog son kullanılan klasörü hatırlıyor) + kurulum betikleri artık ortamı da kuruyor (`kur.sh ortam`, conda öncelikli) — **güncel sürüm** |
+
+### 4.2.0'da neler değişti
+
+- **Yol hafızası.** Dokuz araçta 33 dosya/klasör seçim diyalogu var ve hiçbiri son kullanılan
+  yeri hatırlamıyordu; her tur aynı üç beş klasöre onlarca kez elle gidiliyordu. Artık her
+  diyalog kendi son klasörünü hatırlıyor. Araç kodlarına dokunulmadı — dil ve temada olduğu
+  gibi `QFileDialog` yamalandı.
+- **Kurulum betikleri ortamı da kuruyor.** Önceden yalnızca var olan bir python'u buluyorlardı;
+  ortamı sen kurmak zorundaydın. `./kur.sh ortam` (Windows'ta `kur.bat ortam`) artık ortamı
+  sıfırdan kuruyor — **conda varsa conda ile**, yoksa venv ile — ve `requirements.txt`'i
+  yüklüyor. `./kur.sh tam` ikisini birden yapar.
 
 ### 4.1.0'da neler değişti
 
@@ -445,9 +477,11 @@ Boxify/
 ├── kur.bat / kur.ps1         # Windows masaüstü + Başlat Menüsü kısayolu
 ├── gorseller/                # ekran görüntüleri
 └── boxify/
-    ├── __init__.py           # sürüm bilgisi (4.1.0)
+    ├── __init__.py           # sürüm bilgisi (4.2.0)
     ├── dil.py                # TR/EN dil eklentisi: sözlük + PyQt çeviri yamaları
-    ├── tema.py               # ortak açık tema (beyaz + mavi, renk körlüğü dostu)
+    ├── tema.py               # açık/koyu tema: palet + stil renk çevirisi
+    ├── proje.py              # dosya diyaloglarının son kullandığı klasör hafızası
+    ├── gstreamer_yardim.py   # Linux'a özgü GStreamer/glib düzeltmesi
     ├── klasor_ac.py          # işletim sistemine göre "klasörü aç"
     ├── ana_pencere.py        # kabuk: kenar çubuğu + sayfa yığını + dil değiştirici
     ├── sayfalar/
@@ -508,6 +542,11 @@ tag'e geçebilirsin — bkz. [Sürüm geçmişi](#sürüm-geçmişi).
   atarsa hiçbir sinyal çıkmaz ve arayüz ilerlemeyen bir çubukta asılı kalır. ffmpeg çağıran
   işçiler bu yüzden `Popen`'i her zaman try/except içinde açar ve hatayı `error` sinyaliyle
   bildirir.
+- **Yol hafızası:** Dokuz araçta toplam 33 dosya/klasör seçim diyalogu var ve bir tur bunların
+  arasında gidip gelmekle geçiyor. Her diyalog en son nereyi açtığını hatırlar
+  (`boxify/proje.py`), böylece aynı klasöre onlarca kez elle gidilmez. Anahtar diyalogun
+  başlığıdır — her alan kendi hafızasını tutar, çıktı klasörü seçerken model klasörü
+  önerilmez. Çağıran zaten bir başlangıç verdiyse ona dokunulmaz.
 - **Tek bölme kodu:** Yakın-kopya gruplaması ve train/val/test dağıtımı yalnızca
   `boxify/araclar/veri_bolme.py`'de. Bir zamanlar iki uygulama vardı — Veri Denetçi'ninki gruplu,
   Labelapp'inki `random.shuffle` — ve eğitim düğmesi yanlış olana bağlıydı. İkinci bir bölme kodu

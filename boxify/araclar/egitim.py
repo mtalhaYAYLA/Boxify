@@ -1017,8 +1017,11 @@ def main():
     app = QApplication(sys.argv)
     # Tek başına çalıştırıldığında tema ayarını kabuk yüklemez; buradan okunur
     from .. import tema as _tema
+    from .. import proje as _proje
     _tema.tema_yukle()
     _tema.yamalari_kur()
+    _proje.yukle()
+    _proje.yamalari_kur()
     app.setStyleSheet(_tema.stil())
     w = MainWindow()
     w.show()

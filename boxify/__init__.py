@@ -5,6 +5,8 @@ hazırlamanın dokuz aracını tek çatı altında toplar: video kırpma, kare a
 oto etiket, elle etiket, veri denetimi, eğitim, hata analizi, model
 karşılaştırma ve model export.
 
+4.2.0: Dosya diyaloglarında yol hafızası + kurulum betiklerinin ortamı da
+       kurabilmesi (conda öncelikli).
 4.1.0: Açık/koyu tema seçimi (kenar çubuğundan, dil ile aynı yerde) +
        platform desteğinin üç sistemde eşitlenmesi.
 4.0.0: Döngü uygulamanın içinde kapandı. Eğitim aracı (kendi modelinden ince
@@ -17,5 +19,5 @@ karşılaştırma ve model export.
 2.0.2: TR/EN arayüz dili desteği (boxify/dil.py eklentisi).
 """
 
-SURUM = "4.1.0"
+SURUM = "4.2.0"
 UYGULAMA_ADI = "Boxify"

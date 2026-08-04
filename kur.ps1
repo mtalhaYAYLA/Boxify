@@ -1,18 +1,119 @@
-# Boxify'i Windows masaustune ve Baslat Menusune kisayol olarak kaydeder.
-# Kullanim (kur.bat uzerinden):  kur.bat          - kur
-#                                 kur.bat kaldir   - kaldir
+# Boxify kurulumu (Windows).
+#
+#   kur.bat              - uygulamayi masaustune ve Baslat Menusune kaydet
+#   kur.bat ortam        - Python ortamini kur (conda varsa conda, yoksa venv)
+#   kur.bat ortam venv   - ortami zorla venv ile kur
+#   kur.bat ortam conda  - ortami zorla conda ile kur
+#   kur.bat tam          - once ortam, sonra uygulama kaydi
+#   kur.bat kaldir       - uygulama kaydini geri al
 #
 # macOS ve Linux icin bu dosya degil kur.sh kullanilir.
 
 param(
-    [string]$Islem = ""
+    [string]$Islem = "",
+    [string]$Secenek = ""
 )
+
+$OrtamAdi = if ($env:BOXIFY_ENV) { $env:BOXIFY_ENV } else { "boxify" }
+$PySurum  = if ($env:BOXIFY_PY)  { $env:BOXIFY_PY }  else { "3.11" }
 
 $Dizin = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Masaustu = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Boxify.lnk'
 $BaslatMenu = Join-Path ([Environment]::GetFolderPath('Programs')) 'Boxify.lnk'
 $IkonPng = Join-Path $Dizin 'ikon.png'
 $IkonIco = Join-Path $Dizin 'ikon.ico'
+
+
+# ── Ortam kurulumu ───────────────────────────────────────────────────────────
+# conda oncelikli: ultralytics/torch gibi paketlerin ikili bagimliliklarini
+# conda daha temiz cozuyor. conda yoksa ayni isi venv yapar.
+function Get-Conda {
+    $c = Get-Command conda -ErrorAction SilentlyContinue
+    if ($c) { return $c.Source }
+    foreach ($aday in @("$env:USERPROFILE\anaconda3\Scripts\conda.exe",
+                        "$env:USERPROFILE\miniconda3\Scripts\conda.exe",
+                        "$env:USERPROFILE\miniforge3\Scripts\conda.exe",
+                        "C:\ProgramData\anaconda3\Scripts\conda.exe")) {
+        if (Test-Path $aday) { return $aday }
+    }
+    return $null
+}
+
+function Install-Conda-Env {
+    $conda = Get-Conda
+    if (-not $conda) { return $false }
+    Write-Host "conda: $conda"
+    $kok = & $conda info --base
+    $py  = Join-Path $kok "envs\$OrtamAdi\python.exe"
+
+    if (Test-Path $py) {
+        Write-Host "Ortam zaten var: $OrtamAdi"
+    } else {
+        Write-Host "conda ortami olusturuluyor: $OrtamAdi (python $PySurum)"
+        & $conda create -y -n $OrtamAdi "python=$PySurum"
+        if ($LASTEXITCODE -ne 0) { return $false }
+    }
+    if (-not (Test-Path $py)) { Write-Host "HATA: python bulunamadi: $py"; return $false }
+
+    Write-Host "Bagimliliklar kuruluyor..."
+    & $py -m pip install --upgrade pip | Out-Null
+    & $py -m pip install -r (Join-Path $Dizin "requirements.txt")
+    if ($LASTEXITCODE -ne 0) { return $false }
+
+    Write-Host ""
+    Write-Host "Tamam: conda ortami hazir -> $OrtamAdi"
+    Write-Host "  Elle kullanmak icin:  conda activate $OrtamAdi; python `"$Dizin\boxify.py`""
+    Set-Content -Path (Join-Path $Dizin ".boxify_python") -Value $py -NoNewline
+    return $true
+}
+
+function Install-Venv-Env {
+    $venv = Join-Path $Dizin ".venv"
+    $py = Join-Path $venv "Scripts\python.exe"
+    if (-not (Test-Path $py)) {
+        $taban = Get-Command python -ErrorAction SilentlyContinue
+        if (-not $taban) { Write-Host "HATA: python bulunamadi."; return $false }
+        Write-Host "venv olusturuluyor: $venv"
+        & $taban.Source -m venv $venv
+        if ($LASTEXITCODE -ne 0) { return $false }
+    } else {
+        Write-Host "venv zaten var: $venv"
+    }
+    Write-Host "Bagimliliklar kuruluyor..."
+    & $py -m pip install --upgrade pip | Out-Null
+    & $py -m pip install -r (Join-Path $Dizin "requirements.txt")
+    if ($LASTEXITCODE -ne 0) { return $false }
+    Write-Host ""
+    Write-Host "Tamam: venv hazir -> $venv"
+    Write-Host "  Elle kullanmak icin:  $venv\Scripts\activate; python `"$Dizin\boxify.py`""
+    Set-Content -Path (Join-Path $Dizin ".boxify_python") -Value $py -NoNewline
+    return $true
+}
+
+function Install-Env {
+    switch ($Secenek) {
+        "conda" { if (-not (Install-Conda-Env)) { Write-Host "HATA: conda ile kurulum basarisiz."; exit 1 } }
+        "venv"  { if (-not (Install-Venv-Env))  { Write-Host "HATA: venv ile kurulum basarisiz.";  exit 1 } }
+        ""      {
+            if (Get-Conda) {
+                Write-Host "conda bulundu, onunla kuruluyor (venv istersen: kur.bat ortam venv)"
+                if (-not (Install-Conda-Env)) {
+                    Write-Host "conda basarisiz, venv deneniyor..."
+                    if (-not (Install-Venv-Env)) { exit 1 }
+                }
+            } else {
+                Write-Host "conda yok, venv ile kuruluyor"
+                if (-not (Install-Venv-Env)) { exit 1 }
+            }
+        }
+        default { Write-Host "Bilinmeyen secenek: $Secenek (conda | venv)"; exit 1 }
+    }
+    Write-Host ""
+    Write-Host "Sirada: kur.bat   - uygulamayi masaustune ve Baslat Menusune kaydeder"
+}
+
+if ($Islem -eq 'ortam') { Install-Env; exit 0 }
+if ($Islem -eq 'tam')   { Install-Env; Write-Host ""; $Islem = '' }
 
 if ($Islem -eq 'kaldir') {
     Remove-Item -ErrorAction SilentlyContinue $Masaustu, $BaslatMenu
@@ -26,6 +127,9 @@ if ($Islem -eq 'kaldir') {
 # ama sekiz aractan besi ilk tiklamada eksik bagimlilik hatasi verir.
 function Get-Adaylar {
     if ($env:BOXIFY_PYTHON) { $env:BOXIFY_PYTHON }
+    # 'kur.bat ortam' kurdugu yorumlayiciyi buraya yazar
+    $isaret = Join-Path $Dizin ".boxify_python"
+    if (Test-Path $isaret) { (Get-Content $isaret -Raw).Trim() }
     if ($env:VIRTUAL_ENV)   { Join-Path $env:VIRTUAL_ENV 'Scripts\python.exe' }
     Join-Path $Dizin '.venv\Scripts\python.exe'
     if ($env:CONDA_PREFIX)  { Join-Path $env:CONDA_PREFIX 'python.exe' }

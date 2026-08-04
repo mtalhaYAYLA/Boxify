@@ -27,14 +27,18 @@ from PyQt5.QtGui import QIcon                     # noqa: E402
 from boxify import SURUM                          # noqa: E402
 from boxify import dil                            # noqa: E402
 from boxify import tema                           # noqa: E402
+from boxify import proje                          # noqa: E402
 
-# Dil ve tema yamaları her pencereden önce kurulmalı: ikisi de Qt API'lerini
-# sarmalıyor (dil metinleri, tema stil renklerini çevirir). Varsayılan durumda
-# — Türkçe + açık tema — hiçbir yama kurulmaz, dolayısıyla maliyeti de yoktur.
+# Yamalar her pencereden önce kurulmalı; üçü de Qt API'lerini sarmalıyor:
+# dil metinleri, tema stil renklerini, proje ise dosya diyaloglarının
+# başlangıç klasörünü. Dil ve tema varsayılan durumda (Türkçe + açık tema)
+# hiç yama kurmaz; yol hafızası her zaman etkindir.
 dil.dil_yukle()
 dil.yamalari_kur()
 tema.tema_yukle()
 tema.yamalari_kur()
+proje.yukle()
+proje.yamalari_kur()
 
 from boxify.ana_pencere import AnaPencere         # noqa: E402
 
