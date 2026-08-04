@@ -155,6 +155,9 @@ git checkout main        # güncele dön
   İptal) artık kaydırmayan bir şeritte sabit duruyor; nadir kullanılan ayar grupları katlanabilir.
 - **Depo düzleştirildi** — kod artık kökte tek bir ağaçta (`boxify.py` + `boxify/`); eski sürüm
   klasörleri kaldırıldı, geçmiş yukarıdaki tag'lerde duruyor.
+- **Cihaz seçimi platforma göre** — Apple donanımında artık `cuda:0` yerine **GPU (Apple MPS)**
+  sunuluyor. Önceden macOS'ta CUDA seçilebiliyordu ve her kare `Invalid CUDA device` ile patlayıp
+  sessizce boş bir rapor üretiyordu; artık bir model hiçbir karede çalışamazsa bu açıkça bildirilir.
 - **Çeviri boşlukları kapatıldı** — Hata Analizi, Model Export, Veri Denetçi ve Video Kırpıcı'da
   İngilizce moda düşmeyen 26 etiket tamamlandı.
 

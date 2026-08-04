@@ -15,6 +15,8 @@ Kullanım:
 `tamamlandi(path, names, hata)` — hata boşsa names doludur.
 """
 
+import sys
+
 from PyQt5.QtCore import QThread, pyqtSignal
 
 
@@ -35,6 +37,27 @@ class SinifYukleyici(QThread):
             self.tamamlandi.emit(self.yol, {}, f"{type(e).__name__}: {e}")
             return
         self.tamamlandi.emit(self.yol, names, "")
+
+
+def cihaz_secenekleri():
+    """Bu platformda anlamlı olan çıkarım cihazları: [(etiket, deger)].
+
+    Kullanılabilirlik torch'a sorulmaz — `import torch` saniyeler sürer ve bu
+    liste arayüz kurulurken gerekir. Platform yeterli bir ayrım sağlıyor:
+    Apple donanımında CUDA yok (yerine Metal/MPS var), diğerlerinde MPS yok.
+    Yanlış seçenek sunmak, her karede "Invalid CUDA device" ile patlayan ve
+    sessizce boş rapor üreten bir koşuya yol açıyordu.
+    """
+    if sys.platform == "darwin":
+        return [("Otomatik", None), ("GPU (Apple MPS)", "mps"), ("CPU", "cpu")]
+    return [("Otomatik", None), ("GPU (cuda:0)", 0), ("CPU", "cpu")]
+
+
+def cihaz_combo_doldur(combo):
+    """Bir QComboBox'ı platforma uygun cihaz seçenekleriyle doldurur."""
+    for etiket, deger in cihaz_secenekleri():
+        combo.addItem(etiket, deger)
+    return combo
 
 
 def sinif_ozeti(names: dict, en_fazla: int = 40) -> str:

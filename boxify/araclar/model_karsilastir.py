@@ -38,7 +38,7 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QImage, QPixmap
 
 from ..tema import STYLE, MAVI  # ortak açık tema — bkz. boxify/tema.py
-from .model_bilgi import SinifYukleyici, sinif_ozeti
+from .model_bilgi import SinifYukleyici, sinif_ozeti, cihaz_combo_doldur
 
 MAX_MODELS = 3
 HARFLER = ["A", "B", "C"]
@@ -845,9 +845,7 @@ class MainWindow(QMainWindow):
         gp.addLayout(self._spin_row("Maks tespit", self.maxdet_spin))
 
         self.device_combo = QComboBox()
-        self.device_combo.addItem("Otomatik", None)
-        self.device_combo.addItem("GPU (cuda:0)", 0)
-        self.device_combo.addItem("CPU", "cpu")
+        cihaz_combo_doldur(self.device_combo)
         self.device_combo.setFixedWidth(140)
         gp.addLayout(self._spin_row("Cihaz", self.device_combo))
 
@@ -1446,6 +1444,18 @@ class MainWindow(QMainWindow):
     def _on_summary(self, summary: dict, cfg: dict):
         self.report_box.setPlainText(self._build_report(summary, cfg))
         self.tabs.setCurrentIndex(1)
+
+        # Tek bir kare bile üretemeyen model, "0 tespit" satırıyla sanki bir
+        # sonuç vermiş gibi görünür; sebebi (yanlış cihaz, bozuk ağırlık…)
+        # yalnızca log sekmesinde kalmasın
+        colu = [lbl for lbl, s in summary.items() if s["kare"] == 0 and s["hata"]]
+        if colu:
+            QMessageBox.warning(
+                self, "Model çalışmadı",
+                "Şu model(ler) hiçbir karede çıkarım yapamadı:\n  "
+                + "\n  ".join(colu)
+                + "\n\nSebebi Log sekmesinde yazıyor (sık görülen neden: "
+                  "bu makinede olmayan bir cihazın seçilmesi).")
         toplamlar = ", ".join(f"{lbl}: {s['tespit']}" for lbl, s in summary.items())
         self.stats_lbl.setText(
             f"İşlenen {cfg['islenen_kare']} kare | tespitler → {toplamlar}")

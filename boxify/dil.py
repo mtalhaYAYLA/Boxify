@@ -852,6 +852,8 @@ SOZLUK = {
         "on makes sense when you want to compare each model at its own best "
         "settings; the choice is written into the report too.",
     "Sınıf seçilmedi": "No class selected",
+    "GPU (Apple MPS)": "GPU (Apple MPS)",
+    "Model çalışmadı": "Model did not run",
     "Görünüm ve Ek Çıktılar": "Appearance and Extra Outputs",
     "Çıktı klasörü": "Output folder",
     "Bu modeli karşılaştırmadan çıkar": "Drop this model from the comparison",

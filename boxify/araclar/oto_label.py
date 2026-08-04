@@ -19,7 +19,7 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QImage, QPixmap
 
 from ..tema import STYLE  # ortak açık tema — bkz. boxify/tema.py
-from .model_bilgi import SinifYukleyici
+from .model_bilgi import SinifYukleyici, cihaz_combo_doldur
 
 IMG_EXTS = (".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff")
 
@@ -458,9 +458,7 @@ class MainWindow(QMainWindow):
         gp.addLayout(spin_row("Maks tespit", self.maxdet_spin))
 
         self.device_combo = QComboBox()
-        self.device_combo.addItem("Otomatik", None)
-        self.device_combo.addItem("GPU (cuda:0)", 0)
-        self.device_combo.addItem("CPU", "cpu")
+        cihaz_combo_doldur(self.device_combo)
         self.device_combo.setFixedWidth(140)
         gp.addLayout(spin_row("Cihaz", self.device_combo))
 

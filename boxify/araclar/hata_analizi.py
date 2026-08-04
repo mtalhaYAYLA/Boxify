@@ -24,7 +24,7 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal, QRectF, QLineF
 from PyQt5.QtGui import QImage, QPainter, QPen, QColor, QFont
 
 from ..tema import STYLE  # ortak açık tema — bkz. boxify/tema.py
-from .model_bilgi import SinifYukleyici, sinif_ozeti
+from .model_bilgi import SinifYukleyici, sinif_ozeti, cihaz_combo_doldur
 
 IMG_EXTS = (".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff")
 
@@ -603,9 +603,7 @@ class MainWindow(QMainWindow):
         self.maxdet_spin.setFixedWidth(90)
         gi.addLayout(self._row("Maks tespit", self.maxdet_spin))
         self.device_combo = QComboBox()
-        self.device_combo.addItem("Otomatik", None)
-        self.device_combo.addItem("GPU (cuda:0)", 0)
-        self.device_combo.addItem("CPU", "cpu")
+        cihaz_combo_doldur(self.device_combo)
         self.device_combo.setFixedWidth(130)
         gi.addLayout(self._row("Cihaz", self.device_combo))
         v.addWidget(grp_i)
