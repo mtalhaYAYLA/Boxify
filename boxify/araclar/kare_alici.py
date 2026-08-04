@@ -13,6 +13,7 @@ from PyQt5.QtMultimediaWidgets import QVideoWidget
 
 from ..tema import STYLE  # ortak açık tema — bkz. boxify/tema.py
 from ..klasor_ac import klasoru_ac
+from . import ffmpeg_yardim
 
 
 def ms_to_str(ms: int) -> str:
@@ -75,13 +76,27 @@ class ExtractWorker(QThread):
                 "-q:v", "2",
                 pattern]
 
-        proc = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT, text=True
-        )
-        proc.wait()
+        # ffmpeg yoksa Popen FileNotFoundError atar; bu iş parçacığının
+        # içinde patladığı için hiçbir sinyal çıkmaz ve arayüz "işleniyor"
+        # hâlinde asılı kalırdı. Hatayı burada yakalayıp bildiriyoruz.
+        try:
+            proc = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT, text=True
+            )
+        except FileNotFoundError:
+            self.error.emit("ffmpeg bulunamadı. "
+                            + ffmpeg_yardim.kurulum_ipucu())
+            return
+        except Exception as e:
+            self.error.emit(f"ffmpeg başlatılamadı: {e}")
+            return
+
+        cikti = proc.communicate()[0] or ""
         if proc.returncode != 0:
-            self.error.emit("ffmpeg hatası oluştu.")
+            son = "\n".join(cikti.strip().splitlines()[-3:])
+            self.error.emit("ffmpeg hatası oluştu."
+                            + (f"\n\n{son}" if son else ""))
             return
 
         saved = len([f for f in os.listdir(self.out_dir)
@@ -98,10 +113,26 @@ class MainWindow(QMainWindow):
         self._duration = 0
         self._slider_pressed = False
         self._worker = None
+        self._ffmpeg_eksik = []
         self._build_player()
         self._build_ui()
         self._build_menu()
         self._connect_player()
+        self._check_ffmpeg()
+
+    def _check_ffmpeg(self):
+        """ffmpeg eksikse kare çıkarmayı kapat ve sebebini durum çubuğunda söyle.
+
+        Video Kırpıcı'daki gibi burada bilerek modal kutu açılmıyor: bu metot
+        kurucudan, yani pencere daha gösterilmemişken çağrılıyor ve o aşamada
+        açılan diyalog kabuğun donduğu izlenimi veriyor.
+        """
+        self._ffmpeg_eksik = ffmpeg_yardim.eksik_olanlar(("ffmpeg",))
+        if not self._ffmpeg_eksik:
+            return
+        uyari = ffmpeg_yardim.eksik_mesaji(self._ffmpeg_eksik, "kare çıkarma")
+        self.extract_btn.setToolTip(uyari)
+        self.status.showMessage(uyari)
 
     def _build_player(self):
         self.player = QMediaPlayer(None, QMediaPlayer.VideoSurface)
@@ -345,9 +376,15 @@ class MainWindow(QMainWindow):
         self.play_btn.setEnabled(True)
         self.set_start_btn.setEnabled(True)
         self.set_end_btn.setEnabled(True)
-        self.extract_btn.setEnabled(True)
+        # ffmpeg yoksa çıkarma düğmesi kapalı kalsın; sebebi ipucunda yazıyor
+        self._ffmpeg_eksik = ffmpeg_yardim.eksik_olanlar(("ffmpeg",))
+        self.extract_btn.setEnabled(not self._ffmpeg_eksik)
         self.setWindowTitle(f"Kare Alıcı — {os.path.basename(path)}")
-        self.status.showMessage(f"Yüklendi: {path}")
+        if self._ffmpeg_eksik:
+            self.status.showMessage(
+                ffmpeg_yardim.eksik_mesaji(self._ffmpeg_eksik, "kare çıkarma"))
+        else:
+            self.status.showMessage(f"Yüklendi: {path}")
         self.result_lbl.setText("—")
         self.open_folder_btn.setEnabled(False)
         self._last_out_dir = None
@@ -388,6 +425,12 @@ class MainWindow(QMainWindow):
 
     def _do_extract(self):
         if not self._current_video:
+            return
+        # Modal uyarı ancak kullanıcı düğmeye bastığında — kurucuda değil
+        if self._ffmpeg_eksik:
+            QMessageBox.warning(
+                self, "ffmpeg bulunamadı",
+                ffmpeg_yardim.eksik_mesaji(self._ffmpeg_eksik, "kare çıkarma"))
             return
 
         interval = self.interval_spin.value()

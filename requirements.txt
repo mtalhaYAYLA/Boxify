@@ -1,11 +1,17 @@
-# Boxify 2 bağımlılıkları
-# Önerilen ortam: truck_detect (hepsi zaten kurulu)
+# Boxify 3 bağımlılıkları
 PyQt5>=5.15
 numpy
 opencv-python
-ultralytics>=8.4          # oto-label, hata-analizi, model-export, labelapp eğitimi
+ultralytics>=8.4          # oto-label, hata-analizi, model-karşılaştır, export, labelapp eğitimi
 PyYAML                    # labelapp veri kümesi ve data.yaml okuma/yazma
 # İsteğe bağlı (sadece o export biçimleri için):
 #   tensorrt              # .engine üretimi (NVIDIA GPU gerekir)
 #   openvino              # OpenVINO IR üretimi
-# Sistem paketi: ffmpeg (video kırpma ve kare çıkarma için)
+#   Pillow                # sadece kur.sh (Linux menü ikonu) için
+#
+# Sistem paketi — pip kuramaz, ayrıca kurulmalı:
+#   ffmpeg   Video Kırpıcı ve Kare Alıcı bunu kullanır. Yoksa o iki araç
+#            kendini kapatır ve durum çubuğunda kurulum komutunu gösterir;
+#            diğer altı araç ffmpeg olmadan da çalışır.
+#            macOS: brew install ffmpeg | Windows: winget install ffmpeg
+#            Linux: sudo apt install ffmpeg

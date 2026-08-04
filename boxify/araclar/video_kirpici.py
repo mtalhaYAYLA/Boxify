@@ -63,6 +63,7 @@ if not os.environ.get("VK_KEEP_VAAPI"):
     os.environ.setdefault("GST_PLUGIN_FEATURE_RANK", "vaapisink:0")
 
 from ..tema import STYLE  # ortak açık tema — bkz. boxify/tema.py
+from . import ffmpeg_yardim
 
 VIDEO_EXTS = (".mp4", ".avi", ".mov", ".mkv", ".webm", ".flv", ".wmv", ".m4v", ".mpg", ".mpeg")
 
@@ -180,7 +181,8 @@ class ClipWorker(QThread):
                 text=True, bufsize=1
             )
         except FileNotFoundError:
-            self.error.emit("ffmpeg bulunamadı. Kurulum: sudo apt install ffmpeg")
+            self.error.emit("ffmpeg bulunamadı. "
+                            + ffmpeg_yardim.kurulum_ipucu())
             return
         except Exception as e:
             self.error.emit(f"ffmpeg başlatılamadı: {e}")
@@ -340,23 +342,17 @@ class MainWindow(QMainWindow):
         yaşanan donmanın sebebi buydu). Uyarı, kırpmaya basıldığında zaten
         tekrar veriliyor.
         """
-        self._ffmpeg_eksik = [t for t in ("ffmpeg", "ffprobe")
-                              if not shutil.which(t)]
+        self._ffmpeg_eksik = ffmpeg_yardim.eksik_olanlar()
         if not self._ffmpeg_eksik:
             return
         self.clip_btn.setEnabled(False)
-        uyari = ("Eksik: " + ", ".join(self._ffmpeg_eksik)
-                 + " — kırpma devre dışı. " + self._ffmpeg_kurulum())
+        uyari = ffmpeg_yardim.eksik_mesaji(self._ffmpeg_eksik, "kırpma")
         self.clip_btn.setToolTip(uyari)
         self.status.showMessage(uyari)
 
     @staticmethod
     def _ffmpeg_kurulum() -> str:
-        if sys.platform == "darwin":
-            return "Kurulum: brew install ffmpeg"
-        if sys.platform.startswith("win"):
-            return "Kurulum: winget install ffmpeg"
-        return "Kurulum: sudo apt install ffmpeg"
+        return ffmpeg_yardim.kurulum_ipucu()
 
     # ─────────────────────────────── UI build
 
@@ -1036,8 +1032,7 @@ class MainWindow(QMainWindow):
         if self._ffmpeg_eksik:
             QMessageBox.warning(
                 self, "ffmpeg eksik",
-                "Bulunamadı: " + ", ".join(self._ffmpeg_eksik)
-                + "\n\nKırpma için gerekli.\n" + self._ffmpeg_kurulum())
+                ffmpeg_yardim.eksik_mesaji(self._ffmpeg_eksik, "kırpma"))
             return
         if self._previewing:
             QMessageBox.information(

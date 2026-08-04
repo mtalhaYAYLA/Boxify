@@ -283,12 +283,16 @@ class CompareWorker(QThread):
                     break
                 t0 = time.time()
                 try:
+                    # half yalnızca işaretliyse gönderiliyor: ultralytics 8.4
+                    # bu argümanı her geçişinde "deprecated" uyarısı basıyor
+                    # ve kare başına iki satırla günlüğü boğuyor.
+                    ek = {"half": True} if cfg["half"] else {}
                     res = m["model"].predict(
                         source=frame, conf=m["conf"], iou=m["iou"],
                         imgsz=m["imgsz"], device=cfg["device"],
                         max_det=m["max_det"], classes=m["classes"],
-                        half=cfg["half"], agnostic_nms=cfg["agnostic_nms"],
-                        verbose=False)[0]
+                        agnostic_nms=cfg["agnostic_nms"],
+                        verbose=False, **ek)[0]
                 except Exception as e:
                     stats[m["label"]]["hata"] += 1
                     if m["label"] not in hata_bildirildi:

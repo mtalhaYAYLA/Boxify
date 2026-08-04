@@ -26,11 +26,16 @@ pip install -r requirements.txt
 Başlıca bağımlılıklar: `PyQt5`, `numpy`, `opencv-python`, `ultralytics>=8.4`, `PyYAML`.
 TensorRT ve OpenVINO isteğe bağlıdır (yalnızca o export biçimleri için).
 
-Ayrıca sistemde **ffmpeg** kurulu olmalı (video kırpma ve kare çıkarma için):
+Ayrıca sistemde **ffmpeg** kurulu olmalı — Video Kırpıcı ve Kare Alıcı işi ona yaptırır:
 
 ```bash
-sudo apt install ffmpeg   # Debian/Ubuntu
+brew install ffmpeg          # macOS
+sudo apt install ffmpeg      # Debian/Ubuntu
+winget install ffmpeg        # Windows
 ```
+
+ffmpeg yoksa uygulama açılır ve diğer altı araç normal çalışır; bu iki araç kendi
+düğmesini kapatıp durum çubuğunda platformuna uygun kurulum komutunu gösterir.
 
 #### (İsteğe bağlı) conda ile kurulum
 
@@ -362,7 +367,11 @@ tag'e geçebilirsin — bkz. [Sürüm geçmişi](#sürüm-geçmişi).
 - **Kurucuda modal diyalog yok:** Henüz gösterilmemiş bir pencereye bağlanan modal uyarı bazı
   masaüstlerinde diğer pencerelerin arkasında kalıp uygulamayı kilitlenmiş gösterir. Eksik ffmpeg
   gibi uyarılar bu yüzden durum çubuğunda verilir, modal kutu yalnızca ilgili işleme basılınca
-  çıkar.
+  çıkar. Denetim ve kurulum ipucu tek yerde: `boxify/araclar/ffmpeg_yardim.py`.
+- **İş parçacığında dış süreç:** `subprocess.Popen` bir QThread içinde `FileNotFoundError`
+  atarsa hiçbir sinyal çıkmaz ve arayüz ilerlemeyen bir çubukta asılı kalır. ffmpeg çağıran
+  işçiler bu yüzden `Popen`'i her zaman try/except içinde açar ve hatayı `error` sinyaliyle
+  bildirir.
 - **Tek başına çalıştırma:** Her araç modülü bağımsız da açılabilir:
   `python -m boxify.araclar.veri_denetci` (sürüm klasörünün içinde).
 - **Veri güvenliği:** Hiçbir araç dosya silmez; temizlik daima karantina klasörüne taşımadır.
