@@ -1,4 +1,4 @@
-"""Boxify ortak teması — açık (light) tema, sürüm 2.0.2.
+"""Boxify ortak teması — açık (light) tema.
 
 Tasarım dili (göz yormayan, düşük parlamalı):
 - Sayfa zemini yumuşak gri (#EFF1F5); kart/girdi zeminleri kırık beyaz
