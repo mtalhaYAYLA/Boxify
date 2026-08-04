@@ -13,9 +13,16 @@ akış geçerlidir. Etiket biçimi YOLO txt'dir ve araçlar Ultralytics YOLO mod
 
 ## Kurulum ve çalıştırma
 
+Boxify **macOS, Linux ve Windows'ta** aynı şekilde çalışır: `boxify.py` ve `boxify/` paketi
+platform bağımsızdır, işletim sistemine göre değişen her şey (klasör açma, ffmpeg kurulum
+ipucu, GPU seçeneği, kısayol kurulumu) kodun içinde zaten ayrılmıştır. Aşağıdaki üç adım
+her sistemde geçerli; sadece komutların yazımı değişir.
+
 ### 1) Bağımlılıkları kur
 
-Conda gerekmez — sade bir Python sanal ortamı (`venv`) yeterli:
+Conda gerekmez — sade bir Python sanal ortamı (`venv`) yeterli.
+
+**macOS / Linux**
 
 ```bash
 python3 -m venv .venv
@@ -23,23 +30,33 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+**Windows** (PowerShell)
+
+```powershell
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+```
+
 Başlıca bağımlılıklar: `PyQt5`, `numpy`, `opencv-python`, `ultralytics>=8.4`, `PyYAML`.
 TensorRT ve OpenVINO isteğe bağlıdır (yalnızca o export biçimleri için).
 
-Ayrıca sistemde **ffmpeg** kurulu olmalı — Video Kırpıcı ve Kare Alıcı işi ona yaptırır:
+Ayrıca sistemde **ffmpeg** kurulu olmalı — Video Kırpıcı ve Kare Alıcı işi ona yaptırır.
+ffmpeg bir Python paketi değil, sistem paketidir; `pip` onu kuramaz:
 
-```bash
-brew install ffmpeg          # macOS
-sudo apt install ffmpeg      # Debian/Ubuntu
-winget install ffmpeg        # Windows
-```
+| Sistem | Komut |
+|---|---|
+| **macOS** | `brew install ffmpeg` |
+| **Linux** | `sudo apt install ffmpeg` (Debian/Ubuntu) · `sudo dnf install ffmpeg` (Fedora) |
+| **Windows** | `winget install ffmpeg` — ya da [ffmpeg.org](https://ffmpeg.org/download.html)'dan indirip PATH'e ekle |
 
-ffmpeg yoksa uygulama açılır ve diğer altı araç normal çalışır; bu iki araç kendi
-düğmesini kapatıp durum çubuğunda platformuna uygun kurulum komutunu gösterir.
+ffmpeg yoksa uygulama açılır ve diğer yedi araç normal çalışır; bu iki araç kendi düğmesini
+kapatıp durum çubuğunda **platformuna uygun** kurulum komutunu gösterir.
 
 #### (İsteğe bağlı) conda ile kurulum
 
-Zaten conda kullanıyorsan aynı işi bir conda ortamıyla da yapabilirsin:
+Zaten conda kullanıyorsan aynı işi bir conda ortamıyla da yapabilirsin — komutlar üç sistemde
+de aynıdır:
 
 ```bash
 conda create -n boxify python=3.10
@@ -52,32 +69,37 @@ PyQt5 + ultralytics içeren bir ortamın zaten varsa doğrudan onu aktive edip d
 
 ### 2) Uygulamayı çalıştır
 
+Üç sistemde de aynı komut:
+
 ```bash
 python boxify.py
 ```
 
-### Windows'ta çalıştırma
+#### Sistemler arasında ne değişiyor?
 
-Uygulamanın kendisi (`boxify.py` ve `boxify/` paketi) platform bağımsızdır ve Windows'ta da
-çalışır — adımlar 1 ve 2 aynen geçerli, sadece komutları PowerShell/cmd'de çalıştır:
+Hiçbiri elle ayar istemez — uygulama çalıştığı sistemi tanıyıp doğrusunu seçer:
 
-```powershell
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-python boxify.py
-```
+| Konu | macOS | Linux | Windows |
+|---|---|---|---|
+| **GPU seçeneği** | GPU (Apple MPS) | GPU (cuda:0) | GPU (cuda:0) |
+| **Klasör açma** | `open` | `xdg-open` | `os.startfile` |
+| **ffmpeg kurulum ipucu** | `brew install` | `sudo apt install` | `winget install` |
+| **Eğitimde yükleyici süreci** | 0 (varsayılan) | 8 (varsayılan) | 0 (varsayılan) |
+| **Uygulama kısayolu** | `kur.sh` → `Boxify.app` | `kur.sh` → `.desktop` | `kur.bat` → `.lnk` |
+| **GStreamer/glib düzeltmesi** | gerekmez | otomatik | gerekmez |
 
-Dikkat edilecekler:
+Birkaç ayrıntı:
 
-- **ffmpeg** Windows'ta otomatik gelmez; [ffmpeg.org](https://ffmpeg.org/download.html)'dan indirip
-  PATH'e eklemen gerekir (Video Kırpıcı ve Kare Alıcı bunu kullanır).
-- **Masaüstü/Başlat Menüsü kısayolu:** `kur.sh` macOS ve Linux içindir; Windows'ta karşılığı
-  `kur.bat`'tır — çalıştırınca `ikon.png`'yi otomatik `.ico`'ya çevirip masaüstüne ve Başlat
-  Menüsü'ne ikonlu bir kısayol ekler (`kur.bat kaldir` ile kaldırılır).
-- Araçlardaki "çıktı klasörünü aç" butonları `boxify/klasor_ac.py` üzerinden işletim sistemine göre
-  doğru komutu seçer (Windows'ta `os.startfile`, macOS'ta `open`, Linux'ta `xdg-open`) — ek bir
-  ayar gerekmez.
+- **GPU:** Apple donanımında CUDA yoktur, yerine Metal (MPS) vardır; listede `cuda:0` sunmak
+  her karede `Invalid CUDA device` ile patlayan sessiz bir koşuya yol açıyordu. Seçenekler
+  artık platforma göre üretilir (`boxify/araclar/model_bilgi.py`).
+- **Eğitimde yükleyici süreci:** macOS ve Windows alt süreçleri `spawn` ile açar — her işçi
+  yorumlayıcıyı sıfırdan kurar. Eğitim bir arka plan iş parçacığından başlatıldığı için bu,
+  o iki sistemde takılmaya yol açabiliyor; varsayılan 0. Linux `fork` kullandığından 8 ile
+  başlar. İstersen her sistemde değiştirebilirsin.
+- **GStreamer/glib düzeltmesi:** yalnızca Linux'ta anlamlıdır (conda glib'i ile sistem
+  eklentileri çakışınca oynatıcı hiç açılmaz). `boxify/gstreamer_yardim.py` bunu Linux'ta
+  otomatik uygular, diğer sistemlerde hiçbir şey yapmaz. Kapatmak için `VK_NO_GLIB_FIX=1`.
 
 ### 3) (İsteğe bağlı) Uygulama listesine ekle
 
@@ -109,7 +131,13 @@ bir yorumlayıcı; yoksa PyQt5 yeten biri seçilir ama eksik paket açıkça sö
 Kullanmak istediğini elle de gösterebilirsin:
 
 ```bash
+# macOS / Linux
 BOXIFY_PYTHON=/opt/anaconda3/envs/boxify/bin/python ./kur.sh
+```
+
+```powershell
+# Windows
+$env:BOXIFY_PYTHON = "C:\Users\ad\anaconda3\envs\boxify\python.exe"; .\kur.bat
 ```
 
 > Neden ultralytics de aranıyor? conda kullananlarda `base` ortamında PyQt5 hazır gelir ama

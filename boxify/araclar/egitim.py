@@ -548,11 +548,16 @@ class MainWindow(QMainWindow):
 
         self.workers_spin = QSpinBox()
         self.workers_spin.setRange(0, 32)
-        self.workers_spin.setValue(0 if sys.platform == "darwin" else 8)
+        # macOS ve Windows alt süreçleri "spawn" ile açar: her işçi süreç
+        # yorumlayıcıyı sıfırdan kurup modülleri yeniden import eder. Eğitim
+        # bir QThread içinden başlatıldığı için bu, arayüzden açılan koşularda
+        # takılmaya yol açabiliyor. Linux "fork" kullandığından sorun çıkmıyor.
+        self.workers_spin.setValue(0 if sys.platform in ("darwin", "win32") else 8)
         self.workers_spin.setFixedWidth(90)
         self.workers_spin.setToolTip(
-            "Veri yükleyici süreç sayısı. macOS'ta 0 önerilir: fazlası\n"
-            "arayüzden başlatılan eğitimde takılmaya yol açabiliyor.")
+            "Veri yükleyici süreç sayısı. macOS ve Windows'ta 0 önerilir:\n"
+            "o sistemler alt süreci spawn ile açtığı için arayüzden başlatılan\n"
+            "eğitimde takılmaya yol açabiliyor. Linux'ta 8 iyi bir başlangıç.")
         v2.addLayout(self._row("Yükleyici süreci", self.workers_spin))
         v.addWidget(g2)
 

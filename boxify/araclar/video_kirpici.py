@@ -8,41 +8,15 @@ import subprocess
 from boxify.klasor_ac import klasoru_ac
 
 
-def _fix_gstreamer_glib():
-    """conda ortamının glib'i ile sistem gstreamer eklentileri uyuşmadığında
-    eklentiler yüklenemiyor:
-        Failed to load plugin '.../libgstlibav.so':
-        .../lib/libgio-2.0.so.0: undefined symbol: g_variant_builder_init_static
-        Error: "Your GStreamer installation is missing a plug-in."
-    Sonuç: video/ses çözücü bulunamaz, oynatıcı hiç çalışmaz. Sistem glib'ini
-    LD_PRELOAD ile öne alıp süreci bir kez yeniden başlatarak düzeltiyoruz.
-    Kapatmak için: VK_NO_GLIB_FIX=1 python main.py
-    """
-    if os.environ.get("VK_GLIB_FIXED") or os.environ.get("VK_NO_GLIB_FIX"):
-        return
-    sys_dir = "/usr/lib/x86_64-linux-gnu"
-    libs = [f"{sys_dir}/lib{n}-2.0.so.0" for n in ("glib", "gobject", "gio")]
-    conda_gio = os.path.join(sys.prefix, "lib", "libgio-2.0.so.0")
-    # Sadece ortamın kendi glib'i varsa ve eklentiler sistemden geliyorsa gerekli
-    if not os.path.exists(conda_gio) or not os.path.isdir(f"{sys_dir}/gstreamer-1.0"):
-        return
-    if not all(os.path.exists(p) for p in libs):
-        return
-    env = dict(os.environ)
-    env["VK_GLIB_FIXED"] = "1"
-    preload = ":".join(libs)
-    if env.get("LD_PRELOAD"):
-        preload += ":" + env["LD_PRELOAD"]
-    env["LD_PRELOAD"] = preload
-    try:
-        os.execve(sys.executable, [sys.executable] + sys.argv, env)
-    except OSError:
-        pass        # başarısızsa normal akışa devam et
+# GStreamer/glib düzeltmesi ve vaapi sink kapatması Linux'a özgüdür; ortak
+# koddan geliyor (bkz. boxify/gstreamer_yardim.py). PyQt yüklenmeden ÖNCE
+# çalışmak zorunda olduğu için burada, import'ların arasında duruyor.
+# macOS ve Windows'ta hiçbir şey yapmaz.
+from boxify import gstreamer_yardim
 
-
-# PyQt/gstreamer yüklenmeden önce çalışmalı
 if __name__ == "__main__":
-    _fix_gstreamer_glib()
+    gstreamer_yardim.glib_duzeltmesi()
+gstreamer_yardim.vaapi_sink_kapat()
 
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QSplitter, QVBoxLayout, QHBoxLayout,
@@ -54,13 +28,6 @@ from PyQt5.QtCore import Qt, QUrl, QTimer, QThread, pyqtSignal, QRectF
 from PyQt5.QtGui import QPainter, QColor
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtMultimediaWidgets import QVideoWidget
-
-# gst-vaapi video sink bazı sürücülerde pencere alamıyor ve boru hattını
-# kilitliyor: görüntü donuyor, seek/kare atlama çalışmıyor. Sadece SINK'i
-# devre dışı bırakıyoruz (donanımla çözme etkin kalır).
-# Donanım sink'ini geri istersen: VK_KEEP_VAAPI=1 python main.py
-if not os.environ.get("VK_KEEP_VAAPI"):
-    os.environ.setdefault("GST_PLUGIN_FEATURE_RANK", "vaapisink:0")
 
 from ..tema import STYLE  # ortak açık tema — bkz. boxify/tema.py
 from . import ffmpeg_yardim
