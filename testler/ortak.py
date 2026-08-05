@@ -29,6 +29,41 @@ def gecici(ad: str) -> str:
     return tempfile.mkdtemp(prefix=f"boxify_{ad}_")
 
 
+def gecici_ayar():
+    """Ayar dosyasını geçici bir yola çevir — testler kullanıcınınkine dokunmasın.
+
+    Dil, tema ve yol hafızası hepsi ~/.config/boxify4/ayarlar.json dosyasını
+    kullanıyor. Testler bunu yedekleyip geri koyarak deniyordu; bir test ortada
+    çökerse kullanıcının ayarı bozulmuş kalıyordu — ve bir kez gerçekten oldu:
+    tema "koyu"da, yol hafızası silinmiş geçici klasörlerle dolu kaldı.
+
+    Artık üç modülün yol sabitleri geçici bir klasöre çevriliyor; testin gerçek
+    dosyaya erişimi yok. Dönen fonksiyon çağrılınca eski hâl geri yüklenir.
+    """
+    from boxify import dil, proje, tema
+
+    dizin = tempfile.mkdtemp(prefix="boxify_ayar_")
+    dosya = os.path.join(dizin, "ayarlar.json")
+    onceki = []
+    for modul in (dil, tema, proje):
+        onceki.append((modul, getattr(modul, "AYAR_DIZIN", None),
+                       getattr(modul, "AYAR_DOSYA", None)))
+        if hasattr(modul, "AYAR_DIZIN"):
+            modul.AYAR_DIZIN = dizin
+        if hasattr(modul, "AYAR_DOSYA"):
+            modul.AYAR_DOSYA = dosya
+
+    def geri_al():
+        for modul, eski_dizin, eski_dosya in onceki:
+            if eski_dizin is not None:
+                modul.AYAR_DIZIN = eski_dizin
+            if eski_dosya is not None:
+                modul.AYAR_DOSYA = eski_dosya
+        shutil.rmtree(dizin, ignore_errors=True)
+
+    return dosya, geri_al
+
+
 # ── Sahte veri üretimi ───────────────────────────────────────────────────────
 
 def sahne_kareleri(kok: str, sahne: int = 4, kare: int = 6,

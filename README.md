@@ -561,6 +561,10 @@ tag'e geçebilirsin — bkz. [Sürüm geçmişi](#sürüm-geçmişi).
   atarsa hiçbir sinyal çıkmaz ve arayüz ilerlemeyen bir çubukta asılı kalır. ffmpeg çağıran
   işçiler bu yüzden `Popen`'i her zaman try/except içinde açar ve hatayı `error` sinyaliyle
   bildirir.
+- **Panel düzeni her araçta aynı:** kaynak listesi (varsa) solda, önizleme ortada, **ayarlar ve
+  başlat düğmesi sağda**. Bir dönem Model Karşılaştır ve Eğitim ayarları sola koyuyordu —
+  kaynak listeleri olmadığı için sol boştaydı. Yedi araçta "ayarlar sağda" alışkanlığı kuran
+  kullanıcı o ikisinde her seferinde gözle arıyordu. `testler/test_duzen.py` bu kuralı ölçüyor.
 - **Yol hafızası:** Dokuz araçta toplam 33 dosya/klasör seçim diyalogu var ve bir tur bunların
   arasında gidip gelmekle geçiyor. Her diyalog en son nereyi açtığını hatırlar
   (`boxify/proje.py`), böylece aynı klasöre onlarca kez elle gidilmez. Anahtar diyalogun

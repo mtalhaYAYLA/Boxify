@@ -492,10 +492,15 @@ class MainWindow(QMainWindow):
         vbox.setContentsMargins(0, 0, 0, 0)
         vbox.setSpacing(0)
 
+        # Panel düzeni diğer araçlarla aynı: içerik solda/ortada, AYARLAR SAĞDA.
+        # Bu araçta kaynak listesi olmadığı için sol başlangıçta ayarlara
+        # verilmişti; yedi araçta "ayarlar sağda" alışkanlığı kuran kullanıcı
+        # burada şaşırıyordu.
         splitter = QSplitter(Qt.Horizontal)
-        splitter.addWidget(self._build_left())
         splitter.addWidget(self._build_center())
-        splitter.setSizes([400, 900])
+        splitter.addWidget(self._build_ayarlar())
+        splitter.setSizes([900, 400])
+        splitter.setStretchFactor(0, 1)
         vbox.addWidget(splitter, 1)
 
         self.status = QStatusBar()
@@ -503,7 +508,7 @@ class MainWindow(QMainWindow):
         self.status.showMessage(
             "Video seç, 1-3 model ekle, sınıfları ve ayarları düzenleyip Başlat'a bas.")
 
-    def _build_left(self) -> QWidget:
+    def _build_ayarlar(self) -> QWidget:
         """Sol panel: kaydırılan ayarlar + dibe sabitlenmiş çalıştırma satırı.
 
         Başlat/ilerleme/iptal bilerek kaydırma alanının DIŞINDA duruyor. Bu

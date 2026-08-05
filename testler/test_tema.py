@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import re
 import json
 
-from ortak import yolu_kur, KOK   # noqa: E402
+from ortak import yolu_kur, gecici_ayar, KOK   # noqa: E402
 
 yolu_kur(sahte_ultralytics=False)
 
@@ -65,19 +65,17 @@ for tema_kod in ("acik", "koyu"):
         if okunaksiz: sorun.append(f"{etiket}: {okunaksiz} okunaksiz")
 
 print("\n=== ayar dosyasi ikisini birden tutuyor mu ===")
-import tempfile, shutil
-yedek = None
-if os.path.exists(tema.AYAR_DOSYA):
-    yedek = tema.AYAR_DOSYA + ".yedek"; shutil.copy2(tema.AYAR_DOSYA, yedek)
+# Kullanicinin gercek ayar dosyasina dokunulmuyor
+AYAR, ayar_geri_al = gecici_ayar()
 dil.dil_kaydet("en"); tema.tema_kaydet("koyu")
-icerik = json.load(open(tema.AYAR_DOSYA, encoding="utf-8"))
+icerik = json.load(open(AYAR, encoding="utf-8"))
 print("  ", icerik)
 if icerik.get("dil") != "en" or icerik.get("tema") != "koyu":
     sorun.append(f"ayar dosyasi: {icerik}")
 dil.dil_kaydet("tr"); tema.tema_kaydet("acik")
-icerik2 = json.load(open(tema.AYAR_DOSYA, encoding="utf-8"))
+icerik2 = json.load(open(AYAR, encoding="utf-8"))
 print("   geri alindi:", icerik2)
-if yedek: shutil.move(yedek, tema.AYAR_DOSYA)
+ayar_geri_al()
 
 print("\n" + "="*60)
 print("SONUC:", "GECTI — dort kombinasyon da temiz" if not sorun else f"!! {sorun[:5]}")

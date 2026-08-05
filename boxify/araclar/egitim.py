@@ -422,11 +422,12 @@ class MainWindow(QMainWindow):
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(0)
 
+        # Panel düzeni diğer araçlarla aynı: içerik solda, AYARLAR SAĞDA.
         sp = QSplitter(Qt.Horizontal)
-        sp.addWidget(self._build_left())
-        sp.addWidget(self._build_right())
-        sp.setSizes([390, 850])
-        sp.setStretchFactor(1, 1)
+        sp.addWidget(self._build_icerik())
+        sp.addWidget(self._build_ayarlar())
+        sp.setSizes([850, 390])
+        sp.setStretchFactor(0, 1)
         v.addWidget(sp, 1)
 
         self.status = QStatusBar()
@@ -453,7 +454,7 @@ class MainWindow(QMainWindow):
         h.addWidget(widget)
         return h
 
-    def _build_left(self) -> QWidget:
+    def _build_ayarlar(self) -> QWidget:
         kutu = QWidget()
         kutu.setMinimumWidth(340)
         kutu.setMaximumWidth(470)
@@ -670,7 +671,7 @@ class MainWindow(QMainWindow):
         dis.addWidget(serit)
         return kutu
 
-    def _build_right(self) -> QWidget:
+    def _build_icerik(self) -> QWidget:
         w = QWidget()
         v = QVBoxLayout(w)
         v.setContentsMargins(6, 8, 6, 6)

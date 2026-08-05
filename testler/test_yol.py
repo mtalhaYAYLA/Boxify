@@ -8,7 +8,7 @@ import shutil
 import json
 import tempfile
 
-from ortak import yolu_kur, KOK   # noqa: E402
+from ortak import yolu_kur, gecici_ayar, KOK   # noqa: E402
 
 yolu_kur(sahte_ultralytics=False)
 
@@ -16,10 +16,8 @@ from PyQt5.QtWidgets import QApplication, QFileDialog
 app = QApplication([])
 from boxify import proje
 
-# gercek ayar dosyasina dokunma
-yedek = proje.AYAR_DOSYA + ".test_yedek"
-vardi = os.path.exists(proje.AYAR_DOSYA)
-if vardi: shutil.copy2(proje.AYAR_DOSYA, yedek)
+# Kullanicinin gercek ayar dosyasina dokunulmuyor: yollar gecici klasore cevrilir
+AYAR, ayar_geri_al = gecici_ayar()
 proje._yollar = {}; proje._kaydet()
 
 # cagrilari yakala: hangi baslangic dizini ile acildi?
@@ -86,12 +84,11 @@ print("\n=== 7. ayar dosyasi dil/temayi ezmiyor mu ===")
 from boxify import dil, tema
 dil.dil_kaydet("en"); tema.tema_kaydet("koyu")
 proje.hatirla("getExistingDirectory:Test", B)
-icerik = json.load(open(proje.AYAR_DOSYA, encoding="utf-8"))
+icerik = json.load(open(AYAR, encoding="utf-8"))
 print(f"   {sorted(icerik.keys())}")
 if not {"dil", "tema", "yollar"} <= set(icerik): hata.append(f"ayar eksik: {icerik.keys()}")
 
 shutil.rmtree(B, ignore_errors=True)
-if vardi: shutil.move(yedek, proje.AYAR_DOSYA)
-else: os.remove(proje.AYAR_DOSYA)
+ayar_geri_al()
 print("\n" + "="*56)
 print("SONUC:", "GECTI — yol hafizasi dogru" if not hata else f"!! {hata}")
