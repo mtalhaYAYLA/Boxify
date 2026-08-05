@@ -613,11 +613,16 @@ class IceAktarDialog(QDialog):
             QMessageBox.warning(self, "Klasör yok", "Çıktı klasörünü seç.")
             return
         gorsel_kok = self.gorsel_edit.text().strip()
-        if gorsel_kok and os.path.abspath(out).startswith(
-                os.path.abspath(gorsel_kok) + os.sep):
-            QMessageBox.warning(self, "Geçersiz klasör",
-                                "Çıktı klasörü kaynak görsellerin içinde olamaz.")
-            return
+        # Eşitliği de yakala: sadece startswith(kok + os.sep) bakmak, çıktının
+        # kaynağın TAM KENDİSİ olduğu durumu kaçırıyordu — o zaman kaynak
+        # klasörün içine images/ ve labels/ yazılıp veri iç içe geçiyordu.
+        if gorsel_kok:
+            a, b = os.path.abspath(out), os.path.abspath(gorsel_kok)
+            if a == b or a.startswith(b + os.sep):
+                QMessageBox.warning(
+                    self, "Geçersiz klasör",
+                    "Çıktı klasörü kaynak görsellerin kendisi ya da içinde olamaz.")
+                return
         esleme = self._eslemeyi_topla()
         if not any(v is not None for v in esleme.values()):
             QMessageBox.warning(self, "Hiç sınıf seçilmedi",

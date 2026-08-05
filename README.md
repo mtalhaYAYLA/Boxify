@@ -528,7 +528,7 @@ Kendi boyamasını yapan widget'lar (ör. Eğitim'deki kayıp/mAP eğrisi) rengi
 ## Testler
 
 ```bash
-./testler/calistir.sh          # hepsi (15 test)
+./testler/calistir.sh          # hepsi (16 test)
 ./testler/calistir.sh hizli    # ekran gerektirenleri atla
 ```
 
@@ -555,7 +555,7 @@ Boxify/
 ├── kur.sh                    # macOS (Boxify.app) ve Linux (boxify.desktop) kurulumu
 ├── kur.bat / kur.ps1         # Windows masaüstü + Başlat Menüsü kısayolu
 ├── gorseller/                # ekran görüntüleri
-├── testler/                  # 15 test + sahte ultralytics + calistir.sh
+├── testler/                  # 16 test + sahte ultralytics + calistir.sh
 └── boxify/
     ├── __init__.py           # sürüm bilgisi (4.3.0)
     ├── dil.py                # TR/EN dil eklentisi: sözlük + PyQt çeviri yamaları

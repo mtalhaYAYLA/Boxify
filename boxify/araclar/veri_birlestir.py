@@ -506,10 +506,13 @@ class BirlestirDialog(QDialog):
             QMessageBox.warning(self, "Klasör yok", "Çıktı klasörünü seç.")
             return
         for k in self._kaynaklar:
-            if os.path.abspath(out).startswith(os.path.abspath(k["img_dir"]) + os.sep):
+            # Eşitlik de sayılır: çıktı kaynağın tam kendisiyse veri iç içe geçer
+            a, b = os.path.abspath(out), os.path.abspath(k["img_dir"])
+            if a == b or a.startswith(b + os.sep):
                 QMessageBox.warning(
                     self, "Geçersiz klasör",
-                    f"Çıktı klasörü '{k['ad']}' kaynağının içinde olamaz.")
+                    f"Çıktı klasörü '{k['ad']}' kaynağının kendisi ya da "
+                    f"içinde olamaz.")
                 return
         if os.path.isdir(out) and os.listdir(out):
             if QMessageBox.question(

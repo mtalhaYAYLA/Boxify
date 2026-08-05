@@ -33,6 +33,7 @@ Bu testlerin çoğu, gerçekten yaşanmış bir hatanın peşinden yazıldı. A�
 | `test_ceviri.py` | **İngilizce eksiksiz mi.** Araçların görünen metinlerinde Türkçe karakter kalmadığını tarar. |
 | `test_karsilastir.py` | **Model Karşılaştır uçtan uca.** Sınıf filtresi, modele özel ayar, tek modelle çalışma, hiç sınıf seçilmeyince uyarı, sınıfsız model. |
 | `test_dugmeler.py` | **Erişilebilirlik.** Zorunlu düğmelerin ilk bakışta (kaydırmadan) görünür olduğunu doğrular. |
+| `test_dayaniklilik.py` | **Elle etiketleme ve dayanıklılık.** Labelapp'in tuvali uzun süre "başsız test edilemez" diye kenarda kaldı; Qt olayları doğrudan gönderilerek sınanabiliyormuş. Fare ile çizim, ters yönde çizim, kazara tıklama, görüntü dışına taşma, kaydet/yükle turu, Delete. Ayrıca: iş sürerken kapatma, aynı işi iki kez başlatma, boş klasör, çıktının kaynağın kendisi olması. |
 | `test_gizleme.py` | **Arka planda medya.** Sayfa gizlenince `hideEvent`in kaydırma kutusundan geçip araca ulaştığını — yoksa görünmeyen video çözülmeye devam eder. |
 
 ## Yeni test eklerken
