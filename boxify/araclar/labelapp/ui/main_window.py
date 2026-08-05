@@ -243,7 +243,7 @@ class MainWindow(QMainWindow):
         yazmak, yaptığı işi sessizce bozmak olurdu. Zincir, kutusu olan bir
         kareye gelince orada durur.
         """
-        from ..core.takip import kutulari_tasi as _tasi
+        from ..core.takip import KutuZinciri
 
         ann = self.dataset.current_image
         if ann is None or not ann.bboxes:
@@ -258,12 +258,18 @@ class MainWindow(QMainWindow):
                                     "Bu son kare; taşınacak yer yok.")
             return
 
+        # Varsayılan 8: gerçek fabrika görüntüsünde ölçüldüğünde kutu ilk
+        # ~10 karede nesnenin üstünde kalıyor, sonra kaymaya başlıyor. Zincir
+        # zaten kayınca kendiliğinden duruyor ama cömert bir varsayılan
+        # vermek, insanı gözden geçirmeden güvenmeye iter.
         adet, tamam = QInputDialog.getInt(
             self, "Kutuları Taşı",
             f"Kaç kareye taşınsın?  (sonrasında {kalan} kare var)\n\n"
             f"Yalnızca hiç kutusu olmayan karelere yazılır; kutusu olan bir\n"
-            f"kareye gelinince zincir orada durur.",
-            min(20, kalan), 1, kalan)
+            f"kareye gelinince zincir durur.\n"
+            f"Kutu nesneden kaymaya başlarsa zincir kendiliğinden kesilir —\n"
+            f"yine de taşınanları gözden geçir.",
+            min(8, kalan), 1, kalan)
         if not tamam:
             return
 
@@ -284,9 +290,14 @@ class MainWindow(QMainWindow):
 
         self._autosave()
         baslangic = self.dataset.current_index
-        onceki_kare = oku(ann.image_path)
-        kutular = [(b.x1, b.y1, b.x2, b.y2) for b in ann.bboxes]
+        ilk_kare = oku(ann.image_path)
+        if ilk_kare is None:
+            QMessageBox.warning(self, "Kare okunamadı",
+                                "Bu karenin görseli okunamadı.")
+            return
         siniflar = [b.class_id for b in ann.bboxes]
+        zincir = KutuZinciri(ilk_kare, [(b.x1, b.y1, b.x2, b.y2)
+                                        for b in ann.bboxes])
 
         QApplication.setOverrideCursor(Qt.WaitCursor)
         yazilan = dusen = 0
@@ -305,11 +316,13 @@ class MainWindow(QMainWindow):
                     durma_sebebi = "kare okunamadı"
                     break
 
-                sonuc = _tasi(onceki_kare, sonraki_kare, kutular)
+                onceki_canli = len(zincir.canli)
+                sonuc = zincir.adim(sonraki_kare)
+                dusen += onceki_canli - len(sonuc)
                 if not sonuc:
-                    durma_sebebi = f"{adim}. karede takip kayboldu"
+                    durma_sebebi = (f"{adim}. karede durdu: "
+                                    f"{zincir.son_sebep or 'takip kayboldu'}")
                     break
-                dusen += len(kutular) - len(sonuc)
 
                 pix = QPixmap(hedef.image_path)
                 if pix.isNull():
@@ -321,11 +334,6 @@ class MainWindow(QMainWindow):
                 hedef.save()
                 self._update_list_item(idx)
                 yazilan += 1
-
-                # zincir: bir sonraki adım bu kareden devam eder
-                kutular = [k for _i, k, _g in sonuc]
-                siniflar = [siniflar[i] for i, _k, _g in sonuc]
-                onceki_kare = sonraki_kare
                 QApplication.processEvents()
         finally:
             QApplication.restoreOverrideCursor()

@@ -364,14 +364,36 @@ OpenCV takipçileri yerine bu yöntem seçildi çünkü ötekiler ya `opencv-con
 model ağırlığı istiyor; bu ise saf `opencv-python` ile çalışıyor ve ardışık karelerde (küçük
 hareket, benzer aydınlatma) hem hızlı hem kararlı.
 
-Takip bir tahmindir, o yüzden üç güvenlik kuralı var:
+![Takip destekli etiketleme](gorseller/takip.png)
+
+Takip bir tahmindir, o yüzden güvenlik kuralları var:
 
 - **Var olan kutunun üstüne yazılmaz.** Yalnızca hiç kutusu olmayan karelere yazılır; kutusu olan
   bir kareye gelinince zincir orada durur. Elle çizdiğin bir kutuyu sessizce bozmak, hiç
   taşımamaktan kötüdür.
-- **Zorlanmaz.** Geriye takip edip başlangıç kutusuna dönmeyen sonuç (ileri-geri tutarlılık),
-  yeterli nokta takip edilemeyen ya da ölçeği makul aralığın dışına çıkan kutu bırakılır.
+- **Zorlanmaz.** Geriye takip edip başlangıç kutusuna dönmeyen sonuç, yeterli nokta takip
+  edilemeyen ya da ölçeği makul aralığın dışına çıkan kutu bırakılır.
 - **Sınır dışına düşen kutu elenir.**
+- **Kayma yakalanır ve zincir kesilir.** Bu sonuncusu gerçek fabrika görüntüsünde ölçülerek
+  eklendi. İleri-geri tutarlılık tek başına yetmiyordu: kutu yavaşça nesneden kayarken akış kendi
+  içinde tutarlı kaldığı için güven 0.99'da duruyordu.
+
+  | kare | akış güveni | IoU (gerçek kutuya göre) |
+  |---|---|---|
+  | 5 | 0.99 | 0.95 |
+  | 10 | 0.99 | 0.81 |
+  | 20 | 0.99 | 0.62 |
+  | 30 | 0.99 | 0.37 |
+  | 50 | 1.00 | **0.08** |
+
+  Yani güven "kutu hâlâ nesnenin üstünde mi" sorusunu değil, "noktalar tutarlı hareket etti mi"
+  sorusunu yanıtlıyordu — arka planı takip etmeye başlayınca da tutarlı kalıyordu. Artık kutunun
+  içindeki görüntü **senin çizdiğin ilk kareyle** karşılaştırılıyor; bu ölçü kaymayla birlikte
+  düşüyor ve zinciri kesiyor. Aynı görüntüde zincir artık 11. karede duruyor ve yazılan 10 karenin
+  hepsinde IoU ≥ 0.81.
+
+**Beklenti:** takip birkaç kare için güvenilir, onlarca kare için değil. Varsayılan 8 kare;
+zaten kayınca kendiliğinden kesiliyor. Taşınanları yine de gözden geçir.
 
 ### ☰ Veri Denetçi — denetle, kopyaları ayıkla, sızıntısız böl
 

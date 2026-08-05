@@ -142,6 +142,57 @@ def arayuz_testi(r):
         shutil.rmtree(kok, ignore_errors=True)
 
 
+def kayma_testi(r):
+    """Kutu nesneden kayınca zincir duruyor mu?
+
+    Bu, gerçek fabrika görüntüsünde bulunmuş bir kusurun nöbetçisi: ileri-geri
+    tutarlılık tek başına kaymayı görmüyordu, güven 0.99'da kalırken kutu
+    nesneden tamamen ayrılıyordu (50. karede IoU 0.08). Görünüm denetimi
+    eklendi; bu test onun devrede kaldığını doğrular.
+    """
+    from boxify.araclar.labelapp.core.takip import KutuZinciri, benzerlik, yama_al
+
+    # Nesne bir süre sonra sahneden çıkıp yerine BAŞKA bir şey geliyor.
+    kutu = (100, 90, 160, 140)
+    ilk = sahne((100, 90))
+    zincir = KutuZinciri(ilk, [kutu])
+
+    adim_sayisi = 0
+    for i in range(1, 16):
+        if i <= 5:
+            kare = sahne((100 + i * 3, 90), doku_kay=i)      # normal hareket
+        else:
+            # nesne kayboldu: kutunun olduğu yerde artık düz arka plan var
+            kare = sahne((100 + i * 3, 90), doku_kay=i)
+            kare[80:150, 90:170] = 120
+        sonuc = zincir.adim(kare)
+        if not sonuc:
+            break
+        adim_sayisi += 1
+
+    r.bilgi(f"nesne kaybolunca {adim_sayisi}. adımda durdu — {zincir.son_sebep}")
+    r.kontrol(adim_sayisi < 12, "nesne kaybolunca zincir duruyor",
+              f"{adim_sayisi} adım sürdü")
+    r.kontrol("kaydı" in zincir.son_sebep or "kayboldu" in zincir.son_sebep,
+              "durma sebebi bildiriliyor", zincir.son_sebep)
+
+    # Görünüm ölçüsü kendisi doğru mu: aynı yama 1.0, alakasız yama düşük
+    y1 = yama_al(ilk, kutu)
+    r.kontrol(benzerlik(y1, y1) > 0.99, "aynı yamanın benzerliği 1")
+    rng2 = np.random.default_rng(9)
+    alakasiz = rng2.integers(0, 255, (H, W, 3), dtype=np.uint8)
+    r.kontrol(benzerlik(y1, yama_al(alakasiz, kutu)) < 0.4,
+              "alakasız yamanın benzerliği düşük",
+              f"{benzerlik(y1, yama_al(alakasiz, kutu)):.2f}")
+
+    # Zincir hareketsiz sahnede uzun süre dayanmalı (yanlış alarm olmasın)
+    sabit = sahne((100, 90))
+    z2 = KutuZinciri(sabit, [kutu])
+    dayanan = sum(1 for _ in range(12) if z2.adim(sabit.copy()))
+    r.kontrol(dayanan == 12, "hareketsiz sahnede yanlış alarm yok",
+              f"{dayanan}/12")
+
+
 def main() -> int:
     r = Rapor("Takip destekli etiketleme")
 
@@ -230,6 +281,7 @@ def main() -> int:
     r.kontrol(iou > 0.7, "8 kare zincirinde sapma birikmiyor (IoU > 0.7)",
               f"IoU {iou:.2f}")
 
+    kayma_testi(r)
     arayuz_testi(r)
     return r.bitir()
 
