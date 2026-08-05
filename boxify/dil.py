@@ -1118,6 +1118,39 @@ SOZLUK = {
     "Kendi modelinden devam etmek için bir .pt seç.":
         "Choose a .pt to continue from your own model.",
 
+    # ── COCO / VOC İçe Aktar ──
+    "⇩  COCO / VOC İçe Aktar…": "⇩  Import COCO / VOC…",
+    "COCO / Pascal VOC İçe Aktar": "Import COCO / Pascal VOC",
+    "Kaynak": "Source",
+    "COCO (tek .json)": "COCO (single .json)",
+    "Pascal VOC (.xml klasörü)": "Pascal VOC (.xml folder)",
+    "annotations.json ya da xml klasörü": "annotations.json or xml folder",
+    "Görseller:": "Images:",
+    "görsellerin bulunduğu klasör": "folder containing the images",
+    "Henüz kaynak seçilmedi": "No source chosen yet",
+    "Kutu": "Boxes",
+    "YOLO veri setinin yazılacağı klasör": "folder the YOLO dataset is written to",
+    "iscrowd / difficult kutuları alma": "Leave out iscrowd / difficult boxes",
+    "Kutusuz görselleri alma": "Leave out images without boxes",
+    "⇩  İçe Aktar": "⇩  Import",
+    "İçe aktarma bitti": "Import finished",
+    "COCO açıklama dosyası": "COCO annotation file",
+    "VOC XML klasörü": "VOC XML folder",
+    "Görsellerin bulunduğu klasör": "Folder containing the images",
+    "İçe aktarılan veri seti": "Imported dataset",
+    "Birleştirilen veri seti": "Merged dataset",
+
+    # ── Labelapp: kutuları taşı ──
+    "⇥ Kutuları Taşı": "⇥ Propagate Boxes",
+    "Kutuları Taşı": "Propagate Boxes",
+    "Kutu yok": "No box",
+    "Önce bu karede en az bir kutu çiz; taşınacak kutu yok.":
+        "Draw at least one box on this frame first; there is nothing to propagate.",
+    "Sonraki kare yok": "No next frame",
+    "Bu son kare; taşınacak yer yok.": "This is the last frame; nowhere to propagate.",
+    "Taşıma bitti": "Propagation finished",
+    "opencv gerekli": "opencv required",
+
     # ── Veri Birleştir ──
     "⇉  Veri Setlerini Birleştir…": "⇉  Merge Datasets…",
     "Veri Setlerini Birleştir — sınıf eşlemeli":

@@ -585,6 +585,13 @@ class MainWindow(QMainWindow):
         self.names_lbl.setStyleSheet("color:#6b7686; font-size:11px;")
         g.addWidget(self.names_lbl)
 
+        self.import_btn = QPushButton("⇩  COCO / VOC İçe Aktar…")
+        self.import_btn.setToolTip(
+            "Dışarıdan gelen COCO (JSON) ya da Pascal VOC (XML) veri setini\n"
+            "YOLO txt biçimine çevirir; sınıf eşlemesini sen belirlersin.")
+        self.import_btn.clicked.connect(self._ice_aktar_ac)
+        g.addWidget(self.import_btn)
+
         self.merge_btn = QPushButton("⇉  Veri Setlerini Birleştir…")
         self.merge_btn.setToolTip(
             "Birden çok veri setini tek sete indirger. Sınıf id'leri setler arasında\n"
@@ -783,6 +790,25 @@ class MainWindow(QMainWindow):
             self.split_out_edit.setText(os.path.join(
                 os.path.dirname(img.rstrip(os.sep)) or img, "split"))
 
+    def _ice_aktar_ac(self):
+        """COCO/VOC içe aktarma diyalogunu aç; çıktıyı denetime yükle."""
+        from .veri_ice_aktar import IceAktarDialog
+        d = IceAktarDialog(self)
+        d.exec_()
+        self._cikti_yukle(d.out_edit.text().strip(), "İçe aktarılan veri seti")
+
+    def _cikti_yukle(self, out: str, baslik: str):
+        img = os.path.join(out, "images")
+        if not out or not os.path.isdir(img):
+            return
+        if QMessageBox.question(
+                self, baslik + " denetlensin mi?",
+                baslik + " denetime yüklensin mi?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes) == QMessageBox.Yes:
+            self._set_dirs(img, os.path.join(out, "labels"))
+            self.root_edit.setText(out)
+
     def _birlestir_ac(self):
         """Birleştirme diyalogunu aç; kapanınca çıktı klasörünü denetime yükle.
 
@@ -792,16 +818,7 @@ class MainWindow(QMainWindow):
         from .veri_birlestir import BirlestirDialog
         d = BirlestirDialog(self)
         d.exec_()
-        out = d.out_edit.text().strip()
-        img = os.path.join(out, "images")
-        if out and os.path.isdir(img):
-            if QMessageBox.question(
-                    self, "Birleşik seti denetle",
-                    "Birleştirilen veri seti denetime yüklensin mi?",
-                    QMessageBox.Yes | QMessageBox.No,
-                    QMessageBox.Yes) == QMessageBox.Yes:
-                self._set_dirs(img, os.path.join(out, "labels"))
-                self.root_edit.setText(out)
+        self._cikti_yukle(d.out_edit.text().strip(), "Birleştirilen veri seti")
 
     def _pick_split_out(self):
         d = QFileDialog.getExistingDirectory(self, "Bölme çıktı klasörü",

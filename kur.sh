@@ -215,8 +215,8 @@ EOF
     <key>CFBundleName</key>              <string>Boxify</string>
     <key>CFBundleDisplayName</key>       <string>Boxify</string>
     <key>CFBundleIdentifier</key>        <string>com.boxify.app</string>
-    <key>CFBundleVersion</key>           <string>4.2.0</string>
-    <key>CFBundleShortVersionString</key><string>4.2.0</string>
+    <key>CFBundleVersion</key>           <string>4.3.0</string>
+    <key>CFBundleShortVersionString</key><string>4.3.0</string>
     <key>CFBundlePackageType</key>       <string>APPL</string>
     <key>CFBundleExecutable</key>        <string>Boxify</string>
     <key>CFBundleIconFile</key>          <string>boxify</string>

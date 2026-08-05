@@ -5,6 +5,8 @@ hazırlamanın dokuz aracını tek çatı altında toplar: video kırpma, kare a
 oto etiket, elle etiket, veri denetimi, eğitim, hata analizi, model
 karşılaştırma ve model export.
 
+4.3.0: COCO / Pascal VOC içe aktarma + Labelapp'te takip destekli etiketleme
+       (kutuyu sonraki karelere taşıma).
 4.2.0: Dosya diyaloglarında yol hafızası + kurulum betiklerinin ortamı da
        kurabilmesi (conda öncelikli).
 4.1.0: Açık/koyu tema seçimi (kenar çubuğundan, dil ile aynı yerde) +
@@ -19,5 +21,5 @@ karşılaştırma ve model export.
 2.0.2: TR/EN arayüz dili desteği (boxify/dil.py eklentisi).
 """
 
-SURUM = "4.2.0"
+SURUM = "4.3.0"
 UYGULAMA_ADI = "Boxify"

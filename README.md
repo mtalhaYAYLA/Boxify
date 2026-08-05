@@ -192,7 +192,19 @@ git checkout main        # güncele dön
 | [`v3.0.0`](../../releases/tag/v3.0.0) | **⚖ Model Karşılaştır** (sekizinci araç) + arayüz akıcılığı düzeltmeleri; depo tek kod tabanına düzleştirildi |
 | [`v4.0.0`](../../releases/tag/v4.0.0) | **Döngü uygulamanın içinde kapandı:** ◈ Eğitim (dokuzuncu araç) + ⇉ veri seti birleştirme/sınıf eşleme + sızıntılı bölme hatasının düzeltilmesi + platforma göre kurulum (macOS `.app`) |
 | [`v4.1.0`](../../releases/tag/v4.1.0) | **☀/☾ Açık ve koyu tema** + platform desteğinin macOS/Linux/Windows'ta eşitlenmesi (GStreamer düzeltmesi ARM Linux'ta da çalışıyor) |
-| [`v4.2.0`](../../releases/tag/v4.2.0) | **Yol hafızası** (33 diyalog son kullanılan klasörü hatırlıyor) + kurulum betikleri artık ortamı da kuruyor (`kur.sh ortam`, conda öncelikli) — **güncel sürüm** |
+| [`v4.2.0`](../../releases/tag/v4.2.0) | **Yol hafızası** (33 diyalog son kullanılan klasörü hatırlıyor) + kurulum betikleri artık ortamı da kuruyor (`kur.sh ortam`, conda öncelikli) |
+| [`v4.3.0`](../../releases/tag/v4.3.0) | **⇩ COCO / Pascal VOC içe aktarma** + **⇥ takip destekli etiketleme** (kutuyu sonraki karelere taşıma) — **güncel sürüm** |
+
+### 4.3.0'da neler değişti
+
+- **⇩ COCO / Pascal VOC içe aktarma** (Veri Denetçi'den açılır). Dışarıdan gelen veri setlerini
+  YOLO txt'ye çevirir. Üç biçimin kutu tanımı farklı; dönüşümdeki bir bölme hatası kutuları
+  sessizce kaydırır ve etiket dosyası geçerli görünür. Sınıf eşlemesi tek tek seçilir, taşan
+  kutular kırpılır, `iscrowd`/`difficult` işaretliler elenebilir, hepsi raporlanır.
+- **⇥ Takip destekli etiketleme** (Labelapp). Bir karede çizdiğin kutuları sonraki karelere
+  taşır — 40 karelik klipte aynı nesneyi 40 kez çizmek yerine bir kez çizip sapanları düzeltirsin.
+  Lucas-Kanade optik akışı; saf `opencv-python` ile çalışır. Var olan kutunun üstüne yazmaz,
+  takip kaybolursa zorlamaz.
 
 ### 4.2.0'da neler değişti
 
@@ -342,6 +354,25 @@ ve uygulama içinden eğitim başlatma da burada.
 
 ![Labelapp](gorseller/labelapp.png)
 
+**⇥ Kutuları Taşı** — bu karede çizdiğin kutuları sonraki karelere taşır. Veri ardışık video
+karelerinden geldiği için 40 karelik bir klipte aynı nesneyi 40 kez çizmek gerekiyordu; bir kez
+çizip taşımak, sonra sapanları düzeltmek çok daha hızlı.
+
+Takip, Lucas-Kanade seyrek optik akışıyla yapılır: kutunun içinden köşe noktaları seçilir, bir
+sonraki karede nereye gittikleri bulunur, ortak hareketlerinden öteleme ve ölçek çıkarılır. Hazır
+OpenCV takipçileri yerine bu yöntem seçildi çünkü ötekiler ya `opencv-contrib` ya da indirilecek
+model ağırlığı istiyor; bu ise saf `opencv-python` ile çalışıyor ve ardışık karelerde (küçük
+hareket, benzer aydınlatma) hem hızlı hem kararlı.
+
+Takip bir tahmindir, o yüzden üç güvenlik kuralı var:
+
+- **Var olan kutunun üstüne yazılmaz.** Yalnızca hiç kutusu olmayan karelere yazılır; kutusu olan
+  bir kareye gelinince zincir orada durur. Elle çizdiğin bir kutuyu sessizce bozmak, hiç
+  taşımamaktan kötüdür.
+- **Zorlanmaz.** Geriye takip edip başlangıç kutusuna dönmeyen sonuç (ileri-geri tutarlılık),
+  yeterli nokta takip edilemeyen ya da ölçeği makul aralığın dışına çıkan kutu bırakılır.
+- **Sınır dışına düşen kutu elenir.**
+
 ### ☰ Veri Denetçi — denetle, kopyaları ayıkla, sızıntısız böl
 
 Eğitimden önceki kalite kapısı: bozuk/eksik etiketleri bulur, **dHash** ile yakın kopyaları
@@ -357,6 +388,14 @@ eşlenir, istemediğin sınıf `(atla)` ile düşürülür (kutusu kalmayan gör
 alınmaz), dosya adı çakışması kaynak ön ekiyle çözülür. Çıktı doğrudan denetime yüklenebilir.
 
 ![Veri Denetçi](gorseller/veri_denetci.png)
+
+**⇩ COCO / VOC İçe Aktar** düğmesi dışarıdan gelen veri setlerini YOLO txt'ye çevirir. Üç biçimin
+kutu tanımı farklıdır — COCO `[x, y, w, h]` sol-üst köşeden mutlak, VOC `xmin, ymin, xmax, ymax`
+iki köşe, YOLO ise merkez tabanlı ve normalize; dönüşümdeki bir bölme hatası kutuları sessizce
+kaydırır, etiket dosyası geçerli görünür ama nesneler yanlış yerdedir. Sınıf eşlemesi
+birleştirmedeki gibi tek tek seçilir. Görsel boyutu üstveride yoksa ya da sıfırsa diskten okunur;
+sınırları taşan kutular kırpılır, `iscrowd`/`difficult` işaretliler istenirse elenir — hepsi
+raporlanır.
 
 Aşağıda tam olarak o tehlikeli durum var: `saha_2024`'te `1 = tir`, `saha_2025`'te `0 = tir`.
 Aynı sayı iki sette farklı anlama geliyor; eşleme tablosu ikisini de hedefteki tek `tir` sınıfına
@@ -467,7 +506,7 @@ Kendi boyamasını yapan widget'lar (ör. Eğitim'deki kayıp/mAP eğrisi) rengi
 ## Testler
 
 ```bash
-./testler/calistir.sh          # hepsi (12 test)
+./testler/calistir.sh          # hepsi (15 test)
 ./testler/calistir.sh hizli    # ekran gerektirenleri atla
 ```
 
@@ -494,9 +533,9 @@ Boxify/
 ├── kur.sh                    # macOS (Boxify.app) ve Linux (boxify.desktop) kurulumu
 ├── kur.bat / kur.ps1         # Windows masaüstü + Başlat Menüsü kısayolu
 ├── gorseller/                # ekran görüntüleri
-├── testler/                  # 12 test + sahte ultralytics + calistir.sh
+├── testler/                  # 15 test + sahte ultralytics + calistir.sh
 └── boxify/
-    ├── __init__.py           # sürüm bilgisi (4.2.0)
+    ├── __init__.py           # sürüm bilgisi (4.3.0)
     ├── dil.py                # TR/EN dil eklentisi: sözlük + PyQt çeviri yamaları
     ├── tema.py               # açık/koyu tema: palet + stil renk çevirisi
     ├── proje.py              # dosya diyaloglarının son kullandığı klasör hafızası
@@ -512,10 +551,11 @@ Boxify/
         ├── ffmpeg_yardim.py  # ffmpeg denetimi + platforma uygun kurulum ipucu
         ├── veri_bolme.py     # yakın-kopya gruplama + sızıntısız bölme (tek doğru kaynak)
         ├── veri_birlestir.py # veri seti birleştirme + sınıf eşleme diyalogu
+        ├── veri_ice_aktar.py # COCO / Pascal VOC → YOLO çevirici
         ├── video_kirpici.py
         ├── kare_alici.py
         ├── oto_label.py
-        ├── labelapp/         # core/ (veri) + ui/ (arayüz) paketi
+        ├── labelapp/         # core/ (veri + takip) + ui/ (arayüz) paketi
         ├── veri_denetci.py
         ├── egitim.py
         ├── hata_analizi.py

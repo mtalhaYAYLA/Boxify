@@ -2,7 +2,8 @@ import os
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QSplitter, QListWidget,
                               QListWidgetItem, QVBoxLayout, QHBoxLayout,
                               QPushButton, QLabel, QFileDialog, QStatusBar,
-                              QMessageBox, QFrame, QAction, QShortcut)
+                              QMessageBox, QFrame, QAction, QShortcut,
+                              QInputDialog, QApplication)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor, QKeySequence, QIcon, QPixmap
 
@@ -89,6 +90,10 @@ class MainWindow(QMainWindow):
         self.next_btn = btn("Sonraki  ▶", self._next)
         self.next_btn.setEnabled(False)
         row.addWidget(self.next_btn)
+
+        row.addWidget(btn("⇥ Kutuları Taşı", self._kutulari_tasi,
+                          "Bu karedeki kutuları sonraki karelere taşır "
+                          "(optik akışla takip)"))
 
         row.addStretch()
         row.addWidget(btn("  Eğitimi Başlat  ", self._open_training, color="#2e6da4"))
@@ -229,6 +234,112 @@ class MainWindow(QMainWindow):
     def _next(self):
         if self.dataset.current_index < len(self.dataset.images) - 1:
             self._load(self.dataset.current_index + 1)
+
+    def _kutulari_tasi(self):
+        """Bu karedeki kutuları sonraki N kareye taşı.
+
+        Güvenlik kuralı: yalnızca **hiç kutusu olmayan** karelere yazılır.
+        Takip bir tahmindir; kullanıcının elle çizdiği bir kutunun üstüne
+        yazmak, yaptığı işi sessizce bozmak olurdu. Zincir, kutusu olan bir
+        kareye gelince orada durur.
+        """
+        from ..core.takip import kutulari_tasi as _tasi
+
+        ann = self.dataset.current_image
+        if ann is None or not ann.bboxes:
+            QMessageBox.information(
+                self, "Kutu yok",
+                "Önce bu karede en az bir kutu çiz; taşınacak kutu yok.")
+            return
+
+        kalan = len(self.dataset.images) - self.dataset.current_index - 1
+        if kalan <= 0:
+            QMessageBox.information(self, "Sonraki kare yok",
+                                    "Bu son kare; taşınacak yer yok.")
+            return
+
+        adet, tamam = QInputDialog.getInt(
+            self, "Kutuları Taşı",
+            f"Kaç kareye taşınsın?  (sonrasında {kalan} kare var)\n\n"
+            f"Yalnızca hiç kutusu olmayan karelere yazılır; kutusu olan bir\n"
+            f"kareye gelinince zincir orada durur.",
+            min(20, kalan), 1, kalan)
+        if not tamam:
+            return
+
+        try:
+            import cv2
+            import numpy as np
+        except ImportError as e:
+            QMessageBox.critical(self, "opencv gerekli",
+                                 f"Takip için opencv gerekiyor:\n{e}")
+            return
+
+        def oku(yol):
+            try:
+                return cv2.imdecode(np.fromfile(yol, dtype=np.uint8),
+                                    cv2.IMREAD_COLOR)
+            except Exception:
+                return None
+
+        self._autosave()
+        baslangic = self.dataset.current_index
+        onceki_kare = oku(ann.image_path)
+        kutular = [(b.x1, b.y1, b.x2, b.y2) for b in ann.bboxes]
+        siniflar = [b.class_id for b in ann.bboxes]
+
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        yazilan = dusen = 0
+        durma_sebebi = ""
+        try:
+            for adim in range(1, adet + 1):
+                idx = baslangic + adim
+                hedef = self.dataset.images[idx]
+                hedef.load()
+                if hedef.bboxes:
+                    durma_sebebi = (f"{adim}. karede zaten kutu var — "
+                                    f"üstüne yazılmadı, zincir durdu")
+                    break
+                sonraki_kare = oku(hedef.image_path)
+                if sonraki_kare is None:
+                    durma_sebebi = "kare okunamadı"
+                    break
+
+                sonuc = _tasi(onceki_kare, sonraki_kare, kutular)
+                if not sonuc:
+                    durma_sebebi = f"{adim}. karede takip kayboldu"
+                    break
+                dusen += len(kutular) - len(sonuc)
+
+                pix = QPixmap(hedef.image_path)
+                if pix.isNull():
+                    durma_sebebi = "görsel yüklenemedi"
+                    break
+                hedef.img_width, hedef.img_height = pix.width(), pix.height()
+                hedef.bboxes = [BBox(k[0], k[1], k[2], k[3], siniflar[i])
+                                for i, k, _g in sonuc]
+                hedef.save()
+                self._update_list_item(idx)
+                yazilan += 1
+
+                # zincir: bir sonraki adım bu kareden devam eder
+                kutular = [k for _i, k, _g in sonuc]
+                siniflar = [siniflar[i] for i, _k, _g in sonuc]
+                onceki_kare = sonraki_kare
+                QApplication.processEvents()
+        finally:
+            QApplication.restoreOverrideCursor()
+
+        self._refresh_labeled_count()
+        mesaj = f"{yazilan} kareye kutu taşındı."
+        if dusen:
+            mesaj += f" {dusen} kutu takip edilemeyip bırakıldı."
+        if durma_sebebi:
+            mesaj += f" ({durma_sebebi})"
+        self.status.showMessage(mesaj)
+        QMessageBox.information(
+            self, "Taşıma bitti",
+            mesaj + "\n\nTakip bir tahmindir — taşınan kutuları gözden geçir.")
 
     def _open_training(self):
         if not self.dataset.images:
