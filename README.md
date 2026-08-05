@@ -464,6 +464,24 @@ Kendi boyamasını yapan widget'lar (ör. Eğitim'deki kayıp/mAP eğrisi) rengi
 
 ---
 
+## Testler
+
+```bash
+./testler/calistir.sh          # hepsi (12 test)
+./testler/calistir.sh hizli    # ekran gerektirenleri atla
+```
+
+Testler dış veri istemez — kare, video ve etiketleri kendileri üretip geçici klasörde tutar.
+Gerçek model gerektiren yerlerde `testler/sahte/ultralytics` devreye girer; amaç modelin
+doğruluğunu değil, Boxify'ın modelle doğru konuşup konuşmadığını sınamak.
+
+Çoğu, gerçekten yaşanmış bir hatanın peşinden yazıldı ve o hatanın nöbetçisi:
+sızıntısız bölme, sınıf eşleme, fare isabeti, araç geçişlerindeki donma, üç platformun
+eşitliği, dört dil/tema kombinasyonu, yol hafızası. Hangi testin neyi koruduğu
+[`testler/README.md`](testler/README.md) içinde tek tek yazılı.
+
+---
+
 ## Depo yapısı
 
 ```
@@ -476,6 +494,7 @@ Boxify/
 ├── kur.sh                    # macOS (Boxify.app) ve Linux (boxify.desktop) kurulumu
 ├── kur.bat / kur.ps1         # Windows masaüstü + Başlat Menüsü kısayolu
 ├── gorseller/                # ekran görüntüleri
+├── testler/                  # 12 test + sahte ultralytics + calistir.sh
 └── boxify/
     ├── __init__.py           # sürüm bilgisi (4.2.0)
     ├── dil.py                # TR/EN dil eklentisi: sözlük + PyQt çeviri yamaları
