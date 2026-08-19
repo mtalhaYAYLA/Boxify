@@ -67,7 +67,11 @@ class LabelPanel(QWidget):
         hint = QLabel(
             "Sol tık: bbox çiz\n"
             "Sağ tık: menü (sil/sınıf)\n"
+            "Sağ tık + sürükle: kaydır\n"
+            "Tekerlek: yakınlaştır\n"
+            "Ctrl+0: sığdır\n"
             "Del: seçili sil\n"
+            "Ctrl+Z / Ctrl+Y: geri al / yinele\n"
             "2× tık: adını değiştir\n"
             "A / ◀ : önceki\n"
             "D / ▶ : sonraki"

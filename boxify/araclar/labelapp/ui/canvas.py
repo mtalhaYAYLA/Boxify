@@ -1,11 +1,17 @@
 from PyQt5.QtWidgets import QWidget, QSizePolicy, QMenu, QAction
-from PyQt5.QtCore import Qt, QRect, QPoint, pyqtSignal
+from PyQt5.QtCore import Qt, QRect, QPoint, QEvent, pyqtSignal
 from PyQt5.QtGui import QPainter, QPixmap, QColor, QPen, QFont
 
+from ....tema import renk
+
 # Etkileşim modları
-IDLE, DRAWING, MOVING, RESIZING = range(4)
+IDLE, DRAWING, MOVING, RESIZING, PANNING = range(5)
 HANDLE_HIT = 11   # köşe tutamaç isabet alanı (piksel)
 HANDLE_DRAW = 7   # tutamaç çizim yarıçapı
+
+ZOOM_MIN = 1.0    # sığdırılmış hâlden daha da küçültmenin faydası yok
+ZOOM_MAX = 16.0
+TIKLAMA_ESIGI = 4  # sağ tıkta bu kadar pikselden az hareket "tıklama" sayılır
 
 
 class Canvas(QWidget):
@@ -13,6 +19,9 @@ class Canvas(QWidget):
     bbox_deleted = pyqtSignal(int)
     bbox_class_changed = pyqtSignal(int, int)
     bbox_modified = pyqtSignal()
+    bbox_degisecek = pyqtSignal()      # taşıma/boyutlandırma başlıyor (geri al için)
+    zoom_degisti = pyqtSignal(float)
+    secim_degisti = pyqtSignal(int)    # seçili kutu indeksi, yoksa -1
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -40,15 +49,33 @@ class Canvas(QWidget):
         self._drag_start = QPoint()
         self._drag_orig = None          # (x1, y1, x2, y2) orijinal
         self._drag_handle = -1          # -1=taşı, 0-3=köşe
+        self._drag_bildirildi = False   # bu sürüklemede geri al anlığı alındı mı
+
+        # Yakınlaştırma / kaydırma
+        self._zoom = 1.0
+        self._pan_x = 0.0
+        self._pan_y = 0.0
+        self._pan_start = QPoint()
+        self._pan_orig = (0.0, 0.0)
+        self._imlec = None              # kılavuz çizgileri için son imleç konumu
 
     # ------------------------------------------------------------------ public
 
     def set_image(self, pixmap: QPixmap):
-        self.pixmap = pixmap
-        self._selected = -1
+        # Boş bir QPixmap None gibi davranmaz (nesne olarak "doğru"dur), ama
+        # genişliği 0'dır — ölçek hesabı sıfıra bölerdi. Burada None'a
+        # indirgeniyor; aşağıdaki bütün `if not self.pixmap` kontrolleri ve
+        # "klasör aç" yazısı böylece doğru çalışıyor.
+        self.pixmap = None if (pixmap is None or pixmap.isNull()) else pixmap
+        self.sec(-1)
         self._hover = -1
         self._mode = IDLE
+        # Yeni görüntüde sığdırılmış hâle dön: bir önceki karenin yakınlaştırması
+        # burada nesnenin bulunduğu yeri göstermeyebilir, kullanıcıyı şaşırtır.
+        self._zoom = 1.0
+        self._pan_x = self._pan_y = 0.0
         self._update_transform()
+        self.zoom_degisti.emit(self._zoom)
         self.update()
 
     def set_annotations(self, bboxes, label_classes):
@@ -59,16 +86,124 @@ class Canvas(QWidget):
     def set_current_class(self, cid: int):
         self.current_class_id = cid
 
+
+    def sec(self, idx: int):
+        """Seçimi değiştir ve bildir (kutu üstündeki sınıf paneli buna bakıyor)."""
+        if idx != self._selected:
+            self._selected = idx
+            self.secim_degisti.emit(idx)
+        self.update()
+
+    def secili_rect(self):
+        """Seçili kutunun tuval koordinatındaki dikdörtgeni; yoksa None."""
+        if 0 <= self._selected < len(self.annotations):
+            return self._bbox_rect(self.annotations[self._selected])
+        return None
+
     # ------------------------------------------------------------------ koordinat dönüşümleri
 
-    def _update_transform(self):
-        if not self.pixmap:
-            return
+    def _fit_scale(self) -> float:
+        """Yakınlaştırma olmadan görüntüyü tuvale sığdıran ölçek."""
         sx = self.width() / self.pixmap.width()
         sy = self.height() / self.pixmap.height()
-        self._scale = min(sx, sy) * 0.98
-        self._ox = (self.width() - self.pixmap.width() * self._scale) / 2
-        self._oy = (self.height() - self.pixmap.height() * self._scale) / 2
+        return min(sx, sy) * 0.98
+
+    def _update_transform(self):
+        """`_scale` / `_ox` / `_oy`'yi zoom ve pan'i içerecek şekilde tazeler.
+
+        Kaydırma, görüntü tuvale sığıyorken kilitlenir ve büyütülmüşken
+        kenarlarda boşluk kalmayacak biçimde sınırlanır — böylece görüntüyü
+        ekran dışına sürükleyip kaybetmek mümkün değil.
+        """
+        if not self.pixmap:
+            return
+        self._scale = self._fit_scale() * self._zoom
+        sw = self.pixmap.width() * self._scale
+        sh = self.pixmap.height() * self._scale
+        temel_ox = (self.width() - sw) / 2
+        temel_oy = (self.height() - sh) / 2
+
+        if sw <= self.width():
+            self._pan_x = 0.0
+            self._ox = temel_ox
+        else:
+            ox = min(0.0, max(self.width() - sw, temel_ox + self._pan_x))
+            self._pan_x = ox - temel_ox
+            self._ox = ox
+
+        if sh <= self.height():
+            self._pan_y = 0.0
+            self._oy = temel_oy
+        else:
+            oy = min(0.0, max(self.height() - sh, temel_oy + self._pan_y))
+            self._pan_y = oy - temel_oy
+            self._oy = oy
+
+    # ------------------------------------------------------------------ yakınlaştırma
+
+    def _apply_zoom(self, yeni: float, cx: float, cy: float):
+        """(cx, cy) tuval noktasını sabit tutarak yakınlaştırmayı değiştirir.
+
+        İmlecin altındaki pikselin yerinde kalması, tekerlekle yakınlaşırken
+        aradığın nesnenin ekrandan kaçmamasını sağlar.
+        """
+        if not self.pixmap:
+            return
+        yeni = max(ZOOM_MIN, min(ZOOM_MAX, yeni))
+        if abs(yeni - self._zoom) < 1e-6:
+            return
+
+        ix = (cx - self._ox) / self._scale      # imlecin altındaki görüntü koordinatı
+        iy = (cy - self._oy) / self._scale
+        self._zoom = yeni
+
+        yeni_olcek = self._fit_scale() * yeni
+        temel_ox = (self.width() - self.pixmap.width() * yeni_olcek) / 2
+        temel_oy = (self.height() - self.pixmap.height() * yeni_olcek) / 2
+        self._pan_x = cx - ix * yeni_olcek - temel_ox
+        self._pan_y = cy - iy * yeni_olcek - temel_oy
+
+        self._update_transform()
+        self.zoom_degisti.emit(self._zoom)
+        self.update()
+
+    def zoom_step(self, carpan: float):
+        self._apply_zoom(self._zoom * carpan, self.width() / 2, self.height() / 2)
+
+    def reset_zoom(self):
+        if not self.pixmap:
+            return
+        self._zoom = 1.0
+        self._pan_x = self._pan_y = 0.0
+        self._update_transform()
+        self.zoom_degisti.emit(self._zoom)
+        self.update()
+
+    def wheelEvent(self, event):
+        if not self.pixmap:
+            return super().wheelEvent(event)
+        # Sürükleme sürerken ölçeği değiştirmek, başlangıç noktası tuval
+        # koordinatında saklandığı için kutuyu kaydırırdı.
+        if self._mode in (DRAWING, MOVING, RESIZING):
+            return
+        delta = event.angleDelta().y()
+        if delta == 0:
+            return
+        self._apply_zoom(self._zoom * (1.0015 ** delta),
+                         event.pos().x(), event.pos().y())
+        event.accept()
+
+    def event(self, e):
+        # Touchpad'de iki parmakla sıkıştırma (macOS/Windows destekliyorsa)
+        if e.type() == QEvent.NativeGesture and self.pixmap:
+            try:
+                if e.gestureType() == Qt.ZoomNativeGesture:
+                    self._apply_zoom(self._zoom * (1.0 + e.value()),
+                                     e.pos().x(), e.pos().y())
+                    return True
+            except Exception:
+                pass
+        return super().event(e)
 
     def _to_img(self, p: QPoint) -> QPoint:
         return QPoint(int((p.x() - self._ox) / self._scale),
@@ -99,10 +234,20 @@ class Canvas(QWidget):
         return f"cls{cid}"
 
     def _bbox_at(self, pos: QPoint) -> int:
+        """İmlecin altındaki kutulardan **en küçük alanlısını** döndürür.
+
+        İlk eşleşeni döndürmek, büyük bir kutunun içindeki küçük kutuyu
+        seçilemez yapıyordu (araç içindeki plaka, insan üstündeki baret gibi
+        iç içe etiketlerde sürekli büyük olan yakalanıyordu).
+        """
+        en_iyi, en_kucuk = -1, None
         for i, b in enumerate(self.annotations):
-            if self._bbox_rect(b).contains(pos):
-                return i
-        return -1
+            r = self._bbox_rect(b)
+            if r.contains(pos):
+                alan = r.width() * r.height()
+                if en_kucuk is None or alan < en_kucuk:
+                    en_iyi, en_kucuk = i, alan
+        return en_iyi
 
     def _handle_at(self, pos: QPoint) -> int:
         """Seçili bbox'ın köşe tutamaçlarından birine yakın mı? 0-3 döner, yoksa -1."""
@@ -122,6 +267,14 @@ class Canvas(QWidget):
             return
         dx = int((cur_pos.x() - self._drag_start.x()) / self._scale)
         dy = int((cur_pos.y() - self._drag_start.y()) / self._scale)
+        if dx == 0 and dy == 0:
+            return
+        # Geri al anlık görüntüsü, kutu gerçekten kımıldadığında alınıyor:
+        # basma anında almak, seçmek için yapılan her tıklamayı yığına
+        # boş bir adım olarak eklerdi.
+        if not self._drag_bildirildi:
+            self._drag_bildirildi = True
+            self.bbox_degisecek.emit()
         ox1, oy1, ox2, oy2 = self._drag_orig
         b = self.annotations[self._selected]
         pw = self.pixmap.width()
@@ -172,10 +325,12 @@ class Canvas(QWidget):
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
-        p.fillRect(self.rect(), QColor(221, 225, 231))
+        # Kendi boyamasını yapan widget'lar tema yamasının dışında kalıyor;
+        # rengi `renk()`ten istemek koyu temada da doğru zemini verir.
+        p.fillRect(self.rect(), QColor(renk("#dde1e7")))
 
         if not self.pixmap:
-            p.setPen(QColor(107, 118, 134))
+            p.setPen(QColor(renk("#6b7686")))
             p.setFont(QFont("Arial", 14))
             p.drawText(self.rect(), Qt.AlignCenter,
                        "Klasör aç ve resim seç\n(Dosya > Klasör Aç)")
@@ -228,6 +383,22 @@ class Canvas(QWidget):
             p.fillRect(self._cur_rect, QColor(255, 220, 0, 30))
             p.drawRect(self._cur_rect)
 
+        # Kılavuz çizgileri — imleci takip eden hizalama çizgileri. Kutunun
+        # kenarını nesneye oturtmak, kenarın uzak ucunun nereye denk geldiğini
+        # görmeden tahmine dayanıyordu.
+        if self._mode in (IDLE, DRAWING) and self._imlec is not None:
+            gorsel = QRect(int(self._ox), int(self._oy), sw, sh)
+            cx, cy = self._imlec.x(), self._imlec.y()
+            if gorsel.contains(cx, cy):
+                # Önce koyu, üstüne kesikli açık: her iki zeminde de okunur.
+                p.setBrush(Qt.NoBrush)
+                p.setPen(QPen(QColor(0, 0, 0, 90), 1))
+                p.drawLine(cx, gorsel.top(), cx, gorsel.bottom())
+                p.drawLine(gorsel.left(), cy, gorsel.right(), cy)
+                p.setPen(QPen(QColor(255, 255, 255, 220), 1, Qt.DashLine))
+                p.drawLine(cx, gorsel.top(), cx, gorsel.bottom())
+                p.drawLine(gorsel.left(), cy, gorsel.right(), cy)
+
     # ------------------------------------------------------------------ fare olayları
 
     def mousePressEvent(self, event):
@@ -235,6 +406,7 @@ class Canvas(QWidget):
             return
 
         if event.button() == Qt.LeftButton:
+            self._drag_bildirildi = False
             handle = self._handle_at(event.pos())
             if handle >= 0:
                 # Köşe tutamaç → boyutlandırma
@@ -256,7 +428,7 @@ class Canvas(QWidget):
                 hit = self._bbox_at(event.pos())
                 if hit >= 0:
                     # Başka bbox'a tıklandı → seç ve taşıma başlat
-                    self._selected = hit
+                    self.sec(hit)
                     self._mode = MOVING
                     self._drag_start = event.pos()
                     self._drag_handle = -1
@@ -268,18 +440,25 @@ class Canvas(QWidget):
                     self._mode = DRAWING
                     self._start = event.pos()
                     self._cur_rect = QRect()
-                    self._selected = -1
-                    self.update()
+                    self.sec(-1)
 
-        elif event.button() == Qt.RightButton:
-            hit = self._bbox_at(event.pos())
-            if hit >= 0:
-                self._selected = hit
-                self.update()
-                self._show_context_menu(event.globalPos(), hit)
+        elif event.button() in (Qt.RightButton, Qt.MiddleButton):
+            # Sağ tuş iki iş yapıyor: sürüklenirse kaydırma, yerinde bırakılırsa
+            # bağlam menüsü. Hangisi olduğuna bırakma anında karar veriliyor.
+            self._mode = PANNING
+            self._pan_start = event.pos()
+            self._pan_orig = (self._pan_x, self._pan_y)
+            self.setCursor(Qt.ClosedHandCursor)
 
     def mouseMoveEvent(self, event):
-        if self._mode == DRAWING:
+        self._imlec = event.pos()
+        if self._mode == PANNING:
+            fark = event.pos() - self._pan_start
+            self._pan_x = self._pan_orig[0] + fark.x()
+            self._pan_y = self._pan_orig[1] + fark.y()
+            self._update_transform()
+            self.update()
+        elif self._mode == DRAWING:
             self._cur_rect = QRect(self._start, event.pos()).normalized()
             self.update()
         elif self._mode in (MOVING, RESIZING):
@@ -288,10 +467,28 @@ class Canvas(QWidget):
             old = self._hover
             self._hover = self._bbox_at(event.pos())
             self._update_cursor(event.pos())
-            if old != self._hover:
-                self.update()
+            # Kılavuz çizgileri imleci takip etmeli; hover değişmese de tazele.
+            self.update()
+
+    def leaveEvent(self, event):
+        self._imlec = None
+        self.update()
+        super().leaveEvent(event)
 
     def mouseReleaseEvent(self, event):
+        if (event.button() in (Qt.RightButton, Qt.MiddleButton)
+                and self._mode == PANNING):
+            self._mode = IDLE
+            yer_degistirme = (event.pos() - self._pan_start).manhattanLength()
+            self._update_cursor(event.pos())
+            if (event.button() == Qt.RightButton
+                    and yer_degistirme <= TIKLAMA_ESIGI):
+                hit = self._bbox_at(event.pos())
+                if hit >= 0:
+                    self.sec(hit)
+                    self._show_context_menu(event.globalPos(), hit)
+            return
+
         if event.button() == Qt.LeftButton:
             if self._mode == DRAWING:
                 r = self._cur_rect
@@ -304,7 +501,7 @@ class Canvas(QWidget):
                         max(0, min(p2.x(), pw)), max(0, min(p2.y(), ph)),
                     )
                 self._cur_rect = QRect()
-            elif self._mode in (MOVING, RESIZING):
+            elif self._mode in (MOVING, RESIZING) and self._drag_bildirildi:
                 self.bbox_modified.emit()
 
             self._mode = IDLE
@@ -313,9 +510,9 @@ class Canvas(QWidget):
             self.update()
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Delete and self._selected >= 0:
+        if event.key() in (Qt.Key_Delete, Qt.Key_Backspace) and self._selected >= 0:
             idx = self._selected
-            self._selected = -1
+            self.sec(-1)
             self.bbox_deleted.emit(idx)
 
     def resizeEvent(self, event):
@@ -351,5 +548,5 @@ class Canvas(QWidget):
         menu.exec_(global_pos)
 
     def _delete_bbox(self, idx: int):
-        self._selected = -1
+        self.sec(-1)
         self.bbox_deleted.emit(idx)
