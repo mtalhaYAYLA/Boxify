@@ -97,6 +97,30 @@ class LabelWorker(QThread):
             for i in sorted(names):
                 f.write(f"  {i}: {names[i]}\n")
 
+    def _acik_sozluk_yukle(self, yol: str, istem: list):
+        """Metinle tespit eden (açık sözlüklü) modeli kur.
+
+        Neden ayrı bir yığın değil: aynı işi Grounding DINO da yapıyor ama
+        transformers ve ayrı bir çeviri modeli getiriyordu. ultralytics zaten
+        zorunlu bağımlılığımız ve içinde YOLO-World ile YOLOE var — sıfır ek
+        paketle aynı yetenek. Sınıf listesi modele metin olarak verildiği için
+        hiç eğitilmemiş bir nesne de aranabiliyor.
+        """
+        ad = os.path.basename(yol).lower()
+        if "yoloe" in ad:
+            from ultralytics import YOLOE
+            model = YOLOE(yol)
+            try:
+                model.set_classes(istem, model.get_text_pe(istem))
+            except Exception:
+                model.set_classes(istem)
+        else:
+            from ultralytics import YOLOWorld
+            model = YOLOWorld(yol)
+            model.set_classes(istem)
+        self.log.emit("Metinle arama açık — istem: " + ", ".join(istem))
+        return model, {i: ad_ for i, ad_ in enumerate(istem)}
+
     def run(self):
         cfg = self.cfg
         try:
@@ -106,10 +130,15 @@ class LabelWorker(QThread):
             self.failed.emit(f"ultralytics/opencv içe aktarılamadı:\n{e}")
             return
 
+        istem = [s.strip() for s in (cfg.get("prompt") or "").split(",") if s.strip()]
+
         try:
             self.log.emit(f"Model yükleniyor: {cfg['model_path']}")
-            model = YOLO(cfg["model_path"])
-            names = dict(model.names)
+            if istem:
+                model, names = self._acik_sozluk_yukle(cfg["model_path"], istem)
+            else:
+                model = YOLO(cfg["model_path"])
+                names = dict(model.names)
             self.model_ready.emit(names)
             self.log.emit(f"Model hazır — {len(names)} sınıf: "
                           + ", ".join(names[i] for i in sorted(names)))
@@ -358,6 +387,15 @@ class MainWindow(QMainWindow):
         h.addWidget(b)
         return h
 
+    def _row_label(self, metin: str, widget) -> QHBoxLayout:
+        h = QHBoxLayout()
+        h.setSpacing(6)
+        lbl = QLabel(metin)
+        lbl.setMinimumWidth(58)
+        h.addWidget(lbl)
+        h.addWidget(widget, 1)
+        return h
+
     def _build_right_panel(self) -> QWidget:
         w = QWidget()
         w.setMinimumWidth(320)
@@ -378,6 +416,44 @@ class MainWindow(QMainWindow):
         self.model_info_lbl.setStyleSheet("color:#6b7686; font-size:11px;")
         gm.addWidget(self.model_info_lbl)
         v.addWidget(grp_m)
+
+        # ── Metinle arama (sıfır-atış)
+        grp_z = QGroupBox("Metinle Ara (sıfır-atış)")
+        gz = QVBoxLayout(grp_z)
+        gz.setSpacing(6)
+        self.zs_chk = QCheckBox("Sınıfları modelden değil, yazdığım metinden al")
+        self.zs_chk.setToolTip(
+            "Eğitilmiş bir modelin yokken kullan: aradığın nesneleri yazarsın,\n"
+            "açık sözlüklü model (YOLO-World / YOLOE) onları kutular.\n"
+            "Sonuç taslaktır — Labelapp'te gözden geçir.")
+        self.zs_chk.toggled.connect(self._zs_degisti)
+        gz.addWidget(self.zs_chk)
+
+        self.zs_edit = QLineEdit()
+        self.zs_edit.setPlaceholderText("aranacak nesneler, virgülle: forklift, baret, palet")
+        self.zs_edit.setEnabled(False)
+        gz.addWidget(self.zs_edit)
+
+        self.zs_model_combo = QComboBox()
+        # Elinde açık sözlüklü ağırlık olmayabilir; ultralytics bu adları ilk
+        # çalıştırmada kendisi indiriyor, dosya seçmeye gerek kalmıyor.
+        self.zs_model_combo.addItem("yolov8s-worldv2.pt (indirilir, küçük)",
+                                    "yolov8s-worldv2.pt")
+        self.zs_model_combo.addItem("yolov8m-worldv2.pt (indirilir, daha iyi)",
+                                    "yolov8m-worldv2.pt")
+        self.zs_model_combo.addItem("yoloe-11s-seg.pt (indirilir)",
+                                    "yoloe-11s-seg.pt")
+        self.zs_model_combo.addItem("Yukarıdaki model kutusundaki dosyayı kullan", "")
+        self.zs_model_combo.setEnabled(False)
+        gz.addLayout(self._row_label("Ağırlık", self.zs_model_combo))
+
+        self.zs_bilgi = QLabel(
+            "Eğitilmiş modelin yokken kullan. Sonuç taslaktır: düşük eşikle "
+            "çalıştırıp Labelapp'te gözden geçirmek en hızlı yol.")
+        self.zs_bilgi.setWordWrap(True)
+        self.zs_bilgi.setStyleSheet("color:#6b7686; font-size:11px;")
+        gz.addWidget(self.zs_bilgi)
+        v.addWidget(grp_z)
 
         # ── Girdi
         grp_i = QGroupBox("Fotoğraf Klasörü")
@@ -539,6 +615,19 @@ class MainWindow(QMainWindow):
     def _log(self, text: str):
         self.log_box.append(text)
 
+    def _zs_degisti(self, acik: bool):
+        """Metinle arama açıkken modelin kendi sınıf listesi anlamını yitirir."""
+        self.zs_edit.setEnabled(acik)
+        self.zs_model_combo.setEnabled(acik)
+        if hasattr(self, "class_list"):
+            self.class_list.setEnabled(not acik)
+        if acik:
+            self.zs_edit.setFocus()
+            self.model_info_lbl.setText(
+                "Sınıflar metinden alınacak — modelin kendi listesi kullanılmıyor.")
+        else:
+            self._set_names(self._names)
+
     def _pick_model(self):
         p, _ = QFileDialog.getOpenFileName(
             self, "YOLO modeli seç", self._model_path or "",
@@ -673,9 +762,20 @@ class MainWindow(QMainWindow):
     def _start(self):
         if self._worker:
             return
-        if not self._model_path or not os.path.exists(self._model_path):
+        # Sıfır-atışta seçilen ağırlık diskte olmayabilir: ultralytics onu
+        # adından indiriyor. O yüzden dosya varlığı yalnızca normal kipte aranır.
+        zs_agirlik = (self.zs_model_combo.currentData()
+                      if self.zs_chk.isChecked() else "")
+        if not zs_agirlik and (not self._model_path
+                               or not os.path.exists(self._model_path)):
             QMessageBox.warning(self, "Model yok", "Geçerli bir model (.pt) seç.")
             return
+        if self.zs_chk.isChecked() and not self.zs_edit.text().strip():
+            QMessageBox.warning(self, "Metin boş",
+                                "Metinle arama açık ama ne aranacağı yazılmamış.\n"
+                                "Virgülle ayırarak yaz: forklift, baret, palet")
+            return
+
         if not self._img_dir or not self._images:
             QMessageBox.warning(self, "Fotoğraf yok",
                                 "Fotoğraf klasörü seç (klasörde desteklenen görsel bulunamadı).")
@@ -700,7 +800,7 @@ class MainWindow(QMainWindow):
             return
 
         cfg = {
-            "model_path": self._model_path,
+            "model_path": zs_agirlik or self._model_path,
             "images": list(self._images),
             "img_dir": self._img_dir,
             "out_dir": self._out_dir,
@@ -717,11 +817,14 @@ class MainWindow(QMainWindow):
             "skip_existing": self.skip_chk.isChecked(),
             "save_conf": self.conf_col_chk.isChecked(),
             "show_preview": self.show_preview_chk.isChecked(),
+            "prompt": self.zs_edit.text().strip() if self.zs_chk.isChecked() else "",
         }
 
         self.log_box.clear()
         self._log(f"{len(self._images)} görsel işlenecek → {self._out_dir}")
-        if cfg["classes"]:
+        if cfg["prompt"]:
+            self._log("Metinle arama: " + cfg["prompt"])
+        elif cfg["classes"]:
             self._log("Sınıf filtresi: " + ", ".join(
                 str(self._names.get(c, c)) for c in cfg["classes"]))
 
