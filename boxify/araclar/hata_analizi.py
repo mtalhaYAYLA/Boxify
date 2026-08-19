@@ -23,7 +23,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QRectF, QLineF
 from PyQt5.QtGui import QImage, QPainter, QPen, QColor, QFont
 
-from ..tema import STYLE  # ortak açık tema — bkz. boxify/tema.py
+from ..tema import STYLE, renk  # ortak açık tema — bkz. boxify/tema.py
 from .model_bilgi import SinifYukleyici, sinif_ozeti, cihaz_combo_doldur
 
 IMG_EXTS = (".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff")
@@ -368,9 +368,11 @@ class PreviewCanvas(QWidget):
 
     def paintEvent(self, ev):
         p = QPainter(self)
-        p.fillRect(self.rect(), QColor("#dde1e7"))
+        # Kendi boyamasını yapan widget tema yamasının dışında kalıyor;
+        # renk() olmadan koyu temada açık gri bir kutu olarak sırıtıyordu.
+        p.fillRect(self.rect(), QColor(renk("#dde1e7")))
         if self._img is None:
-            p.setPen(QColor("#6b7686"))
+            p.setPen(QColor(renk("#6b7686")))
             p.drawText(self.rect(), Qt.AlignCenter, self._info)
             return
 
