@@ -27,7 +27,9 @@ def _tur_yaz(kok, ad, epoch, taban, csv_var=True, map_sutunu=True):
     os.makedirs(os.path.join(d, "weights"), exist_ok=True)
     open(os.path.join(d, "weights", "best.pt"), "w").close()
     with open(os.path.join(d, "args.yaml"), "w", encoding="utf-8") as f:
-        f.write("task: detect\nmodel: /bir/yerde/yolo11n.pt\nepochs: 100\n")
+        f.write(f"task: detect\nmodel: /bir/yerde/yolo11n.pt\n"
+                f"epochs: {epoch or 100}\nbatch: 16\nimgsz: 640\n"
+                f"optimizer: auto\nlr0: 0.01\n")
     if not csv_var:
         return d
     with open(os.path.join(d, "results.csv"), "w", newline="", encoding="utf-8") as f:
@@ -74,6 +76,10 @@ def gecmis_testi(r, app):
                   "mAP sütunu yoksa çökmüyor, boş geçiyor")
         r.kontrol(bool(d["egitim_20260101_1000"]["best"]),
                   "best.pt yolu bulundu")
+        r.kontrol(d["egitim_20260101_1000"]["param"].get("imgsz") == "640"
+                  and d["egitim_20260101_1000"]["param"].get("optimizer") == "auto",
+                  "args.yaml'daki bütün ayarlar okunuyor",
+                  str(sorted(d["egitim_20260101_1000"]["param"]))[:70])
 
         r.kontrol(gecmis_tara("") == [] and gecmis_tara("/yok/boyle/bir/yer") == [],
                   "olmayan klasör boş liste döndürüyor")
@@ -91,10 +97,33 @@ def gecmis_testi(r, app):
         app.processEvents()
         r.kontrol(len(w.gecmis_egri._turlar) == 3,
                   "seçilen turlar eğriye aktarılıyor")
+        # hiperparametre kıyası: farklı olan ayar işaretlenmeli
+        # selectRow seçimi değiştirir, eklemez; kıyas için hepsi seçiliyor
+        w.gecmis_tablo.selectAll()
+        app.processEvents()
+        basliklar = [w.gecmis_param.horizontalHeaderItem(i).text()
+                     for i in range(w.gecmis_param.columnCount())]
+        r.kontrol(basliklar[0] == "Ayar" and len(basliklar) >= 2,
+                  "parametre tablosu turları sütun olarak veriyor", str(basliklar))
+        satirlar = {w.gecmis_param.item(i, 0).text().strip(" •"): i
+                    for i in range(w.gecmis_param.rowCount())}
+        r.kontrol("epochs" in satirlar and "model" in satirlar,
+                  "kıyasta anlamı olan ayarlar listeleniyor",
+                  ", ".join(sorted(satirlar))[:80])
+        isaretli = [w.gecmis_param.item(i, 0).text().strip(" •")
+                    for i in range(w.gecmis_param.rowCount())
+                    if w.gecmis_param.item(i, 0).text().startswith("•")]
+        r.kontrol("epochs" in isaretli,
+                  "turlar arasında değişen ayar işaretleniyor", str(isaretli))
+        r.kontrol("imgsz" not in isaretli,
+                  "tüm turlarda aynı olan ayar işaretlenmiyor")
+
         w.gecmis_tablo.clearSelection()
         app.processEvents()
         r.kontrol(not w.gecmis_egri._turlar and not w.gecmis_ac_btn.isEnabled(),
                   "seçim kalkınca eğri boşalıyor")
+        r.kontrol(w.gecmis_param.rowCount() == 0,
+                  "seçim kalkınca parametre tablosu da boşalıyor")
         w.close()
     finally:
         shutil.rmtree(kok, ignore_errors=True)

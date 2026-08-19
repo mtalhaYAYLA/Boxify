@@ -497,15 +497,17 @@ def gecmis_tara(proje_dizin: str) -> list:
 
         gecerli = [n["map"] for n in egri if n["map"] is not None]
         best = os.path.join(dizin, "weights", "best.pt")
-        baslangic = ""
+        param = {}
         try:
             with open(os.path.join(dizin, "args.yaml"), encoding="utf-8") as f:
                 for satir in f:
-                    if satir.startswith("model:"):
-                        baslangic = os.path.basename(satir.split(":", 1)[1].strip())
-                        break
+                    if ":" not in satir or satir.lstrip().startswith("#"):
+                        continue
+                    anahtar, deger = satir.split(":", 1)
+                    param[anahtar.strip()] = deger.strip()
         except Exception:
             pass
+        baslangic = os.path.basename(param.get("model", "")) if param.get("model") else ""
 
         turlar.append({
             "ad": ad,
@@ -516,6 +518,7 @@ def gecmis_tara(proje_dizin: str) -> list:
             "en_iyi": max(gecerli) if gecerli else None,
             "baslangic": baslangic,
             "best": best if os.path.exists(best) else "",
+            "param": param,
             "egri": egri,
         })
     turlar.sort(key=lambda t: t["tarih"], reverse=True)
@@ -949,9 +952,68 @@ class MainWindow(QMainWindow):
         self.gecmis_tablo.itemSelectionChanged.connect(self._gecmis_secim_degisti)
         v.addWidget(self.gecmis_tablo, 2)
 
+        alt = QHBoxLayout()
+        alt.setSpacing(6)
         self.gecmis_egri = GecmisEgriWidget()
-        v.addWidget(self.gecmis_egri, 3)
+        alt.addWidget(self.gecmis_egri, 3)
+
+        # Turlar arası hiperparametre farkı. Skorun neden değiştiğini
+        # cevaplayan şey eğrinin kendisi değil, ayarların ne değiştiğidir;
+        # iki turu yan yana koyup farkı işaretlemeden bu görülmüyor.
+        self.gecmis_param = QTableWidget(0, 1)
+        self.gecmis_param.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.gecmis_param.verticalHeader().setVisible(False)
+        self.gecmis_param.setMinimumWidth(260)
+        alt.addWidget(self.gecmis_param, 2)
+        v.addLayout(alt, 3)
         return w
+
+    # Kıyasta anlamı olan ayarlar. Tamamını dökmek (ultralytics 80'den fazla
+    # anahtar yazıyor) tabloyu okunmaz yapıyor; buradakiler sonucu gerçekten
+    # değiştirenler. Bunların dışında bir ayar turlar arasında farklıysa o da
+    # ayrıca eklenir — sessizce gizlemek, farkı aramaktan daha kötü.
+    PARAM_ILGINC = ["model", "epochs", "batch", "imgsz", "optimizer", "lr0",
+                    "patience", "freeze", "seed", "device", "workers", "data"]
+
+    def _gecmis_param_doldur(self, turlar):
+        tablo = self.gecmis_param
+        if not turlar:
+            tablo.setRowCount(0)
+            tablo.setColumnCount(1)
+            tablo.setHorizontalHeaderLabels(["Ayar"])
+            return
+
+        anahtarlar = [a for a in self.PARAM_ILGINC if any(a in t["param"] for t in turlar)]
+        if len(turlar) > 1:
+            # Listede olmayan ama turlar arasında değişen ayarları da göster
+            tum = set()
+            for t in turlar:
+                tum |= set(t["param"])
+            for a in sorted(tum - set(anahtarlar)):
+                degerler = {t["param"].get(a) for t in turlar}
+                if len(degerler) > 1:
+                    anahtarlar.append(a)
+
+        tablo.setColumnCount(1 + len(turlar))
+        tablo.setHorizontalHeaderLabels(["Ayar"] + [t["ad"] for t in turlar])
+        tablo.setRowCount(len(anahtarlar))
+        for satir, anahtar in enumerate(anahtarlar):
+            degerler = [t["param"].get(anahtar, "—") for t in turlar]
+            farkli = len(set(degerler)) > 1
+            ad_hucre = QTableWidgetItem(("• " if farkli else "  ") + anahtar)
+            if farkli:
+                ad_hucre.setForeground(QColor(renk("#2e6da4")))
+                yazi = ad_hucre.font(); yazi.setBold(True); ad_hucre.setFont(yazi)
+            ad_hucre.setToolTip("Turlar arasında farklı" if farkli else "Tüm turlarda aynı")
+            tablo.setItem(satir, 0, ad_hucre)
+            for sutun, deger in enumerate(degerler):
+                hucre = QTableWidgetItem(os.path.basename(deger)
+                                         if anahtar in ("model", "data") else deger)
+                hucre.setToolTip(deger)
+                if farkli:
+                    yazi = hucre.font(); yazi.setBold(True); hucre.setFont(yazi)
+                tablo.setItem(satir, 1 + sutun, hucre)
+        tablo.resizeColumnsToContents()
 
     def _gecmisi_tazele(self):
         self._gecmis = gecmis_tara(self._proje)
@@ -971,6 +1033,7 @@ class MainWindow(QMainWindow):
                 self.gecmis_tablo.setItem(satir, sutun, hucre)
         self.gecmis_tablo.resizeColumnsToContents()
         self.gecmis_egri.goster([])
+        self._gecmis_param_doldur([])
         if not self._gecmis:
             self.status.showMessage(
                 "Çıktı klasöründe tamamlanmış tur bulunamadı." if self._proje
@@ -982,6 +1045,7 @@ class MainWindow(QMainWindow):
         satirlar = sorted({i.row() for i in self.gecmis_tablo.selectedItems()})
         secili = [self._gecmis[s] for s in satirlar if s < len(self._gecmis)]
         self.gecmis_egri.goster(secili)
+        self._gecmis_param_doldur(secili)
         self.gecmis_ac_btn.setEnabled(len(secili) == 1)
 
     def _gecmis_klasor_ac(self):

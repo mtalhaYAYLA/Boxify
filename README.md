@@ -465,8 +465,11 @@ Hata Analizi ve Model Karşılaştır'a girer, oradan gelen bilgiyle veri büyü
 - **Geçmiş sekmesi** — çıktı klasöründeki bütün turlar tabloda listelenir (tarih, epoch, en iyi
   mAP50-95, başlangıç ağırlığı); birden fazla tur seçilince mAP eğrileri üst üste çizilir. Tek
   turun eğrisi "eğitim iyi gitti mi" sorusunu cevaplıyor, asıl karar sorusu ise "bu tur bir
-  öncekinden iyi mi" — o da ancak turlar aynı eksene konunca görülüyor. Kaynağı ultralytics'in
-  her turda yazdığı `results.csv`'dir; ek paket gerektirmez.
+  öncekinden iyi mi" — o da ancak turlar aynı eksene konunca görülüyor. Yanında **hiperparametre
+  kıyası** var: seçili turların `args.yaml`'ları yan yana dizilir ve **turlar arasında değişen
+  ayarlar işaretlenir**. Skorun neden değiştiğini cevaplayan şey eğrinin kendisi değil, ayarların
+  ne değiştiğidir. Kaynağı ultralytics'in her turda yazdığı `results.csv` ve `args.yaml`'dır;
+  ek paket gerektirmez.
 - **MLflow'a da kaydet** (isteğe bağlı) — açıkken parametreler, epoch metrikleri ve ağırlıklar
   çıktı klasörünün altındaki `mlflow/` dizinine yazılır; sunucu gerekmez, incelemek için
   `mlflow ui --backend-store-uri <çıktı>/mlflow` yeter. Kutu **kapalıyken kayıt da kapatılır**:
