@@ -425,9 +425,17 @@ SOZLUK = {
 
     # ── Ortak / menüler ──
     "Dosya": "File",
+    "Düzen": "Edit",
     "Çıkış": "Exit",
     "Kaydet": "Save",
     "Tümünü Kaydet": "Save All",
+    "Geri Al": "Undo",
+    "Yinele": "Redo",
+    "Yakınlaştır": "Zoom In",
+    "Uzaklaştır": "Zoom Out",
+    "Sığdır": "Fit",
+    "Geri alınacak bir değişiklik yok.": "Nothing to undo.",
+    "Yinelenecek bir değişiklik yok.": "Nothing to redo.",
     "Hata": "Error",
     "Uyarı": "Warning",
     "Bilgi": "Info",
@@ -1007,15 +1015,68 @@ SOZLUK = {
     "+ Ekle": "+ Add",
     "Adını Değiştir": "Rename",
     "Renk": "Color",
-    "Sol tık: bbox çiz\nSağ tık: menü (sil/sınıf)\nDel: seçili sil\n"
+    "Sol tık: bbox çiz\nSağ tık: menü (sil/sınıf)\n"
+    "Sağ tık + sürükle: kaydır\nTekerlek: yakınlaştır\nCtrl+0: sığdır\n"
+    "Del: seçili sil\nCtrl+Z / Ctrl+Y: geri al / yinele\n"
     "2× tık: adını değiştir\nA / ◀ : önceki\nD / ▶ : sonraki":
         "Left click: draw bbox\nRight click: menu (delete/class)\n"
-        "Del: delete selected\nDouble click: rename\nA / ◀ : previous\n"
-        "D / ▶ : next",
+        "Right drag: pan\nWheel: zoom\nCtrl+0: fit\n"
+        "Del: delete selected\nCtrl+Z / Ctrl+Y: undo / redo\n"
+        "Double click: rename\nA / ◀ : previous\nD / ▶ : next",
+    "Geri al (Ctrl+Z)": "Undo (Ctrl+Z)",
+    "Yinele (Ctrl+Y)": "Redo (Ctrl+Y)",
+    "Yakınlaştır (Ctrl++ veya fare tekerleği)":
+        "Zoom in (Ctrl++ or mouse wheel)",
+    "Uzaklaştır (Ctrl+- veya fare tekerleği)":
+        "Zoom out (Ctrl+- or mouse wheel)",
+    "Sığdır (Ctrl+0). Yakınlaşmışken sağ tuşla sürükleyerek kaydır.":
+        "Fit (Ctrl+0). When zoomed in, right-drag to pan.",
     "Yeni Sınıf": "New Class",
     "Sınıf adı:": "Class name:",
     "Yeni ad:": "New name:",
     "Eğitim Başlat...": "Start Training...",
+    # ── Oto Label: metinle sıfır-atış ──
+    "Metinle Ara (sıfır-atış)": "Search by Text (zero-shot)",
+    "Sınıfları modelden değil, yazdığım metinden al":
+        "Take classes from my text, not from the model",
+    "aranacak nesneler, virgülle: forklift, baret, palet":
+        "objects to find, comma separated: forklift, helmet, pallet",
+    "Ağırlık": "Weights",
+    "Eğitilmiş modelin yokken kullan. Sonuç taslaktır: düşük eşikle "
+    "çalıştırıp Labelapp'te gözden geçirmek en hızlı yol.":
+        "Use it when you have no trained model. The result is a draft: running "
+        "with a low threshold and reviewing in Labelapp is the fastest path.",
+    "Sınıflar metinden alınacak — modelin kendi listesi kullanılmıyor.":
+        "Classes will come from the text — the model's own list is unused.",
+    "Metin boş": "Text is empty",
+    # ── Labelapp: sınıf paneli, araç rayı, görsel silme ──
+    "Sınıf": "Class",
+    "Uygula": "Apply",
+    "sınıf seç ya da yaz": "pick or type a class",
+    "ARAÇLAR": "TOOLS",
+    "Geri Al": "Undo",
+    "Kutuları Taşı": "Carry Boxes",
+    "Görseli Sil": "Delete Image",
+    "Görseli sil": "Delete image",
+    "Bu görseli ve etiketini veri setinden siler":
+        "Deletes this image and its label from the dataset",
+    "Izgara / liste görünümü": "Grid / list view",
+    # ── Eğitim: geçmiş turlar + MLflow ──
+    "Geçmiş": "History",
+    "Tazele": "Refresh",
+    "Tur": "Run",
+    "Epoch": "Epoch",
+    "En iyi mAP50-95": "Best mAP50-95",
+    "Başlangıç": "Start weight",
+    "MLflow'a da kaydet": "Also log to MLflow",
+    "Çıktı klasöründeki turlar. Kıyaslamak için birden fazla satır seç.":
+        "Runs in the output folder. Select more than one row to compare.",
+    "Kıyaslamak için listeden bir ya da birkaç tur seç":
+        "Select one or more runs from the list to compare",
+    "Çıktı klasöründe tamamlanmış tur bulunamadı.":
+        "No completed run found in the output folder.",
+    "Önce bir data.yaml seç — çıktı klasörü ondan belirleniyor.":
+        "Choose a data.yaml first — the output folder is derived from it.",
     "Model Eğitimi": "Model Training",
     "Eğitim Ayarları": "Training Settings",
     "Veri Bölümü (export modunda)": "Data Split (in export mode)",

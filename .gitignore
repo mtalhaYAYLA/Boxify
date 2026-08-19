@@ -21,3 +21,11 @@ modeller/
 # Yerel sanal ortam
 .venv/
 .boxify_python
+
+# İncelemek için indirilen dış proje (arkadaş projesi oto_tag) — depoya girmez
+oto_tag-main/
+oto_tag-main.zip
+
+# MLflow yerel deney deposu
+mlflow/
+mlruns/

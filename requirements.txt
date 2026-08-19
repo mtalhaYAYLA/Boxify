@@ -4,10 +4,16 @@ numpy
 opencv-python
 ultralytics>=8.4          # oto-label, hata-analizi, model-karşılaştır, export, labelapp eğitimi
 PyYAML                    # labelapp veri kümesi ve data.yaml okuma/yazma
-# İsteğe bağlı (sadece o export biçimleri için):
+# İsteğe bağlı:
 #   tensorrt              # .engine üretimi (NVIDIA GPU gerekir)
 #   openvino              # OpenVINO IR üretimi
 #   Pillow                # sadece kur.sh (Linux menü ikonu) için
+#   mlflow                # Eğitim'deki "MLflow'a da kaydet" kutusu için.
+#                         # Kurulu değilse kutu kapalı görünür, başka hiçbir şey
+#                         # etkilenmez — Geçmiş sekmesi results.csv'den beslenir.
+#
+# Metinle sıfır-atış etiketleme (Oto Label) EK PAKET İSTEMEZ: YOLO-World ve
+# YOLOE zaten ultralytics'in içinde gelir, ağırlık ilk kullanımda inilir.
 #
 # Sistem paketi — pip kuramaz, ayrıca kurulmalı:
 #   ffmpeg   Video Kırpıcı ve Kare Alıcı bunu kullanır. Yoksa o iki araç

@@ -344,6 +344,12 @@ Eldeki YOLO modeliyle kareleri tarar, YOLO txt etiketleri üretir. Düşük güv
 çalıştırıp elle düzeltmek, sıfırdan etiketlemekten çok daha hızlıdır: fazladan kutuyu silmek,
 kaçırılmış nesneyi çizmekten kolaydır. İlk turda hazır bir COCO modeli bile işe yarar.
 
+**Metinle Ara (sıfır-atış)** — hiç modelin yokken de ön etiketleme yapılabilir: aradığın nesneleri
+virgülle yazarsın (`forklift, baret, palet`), açık sözlüklü model onları kutular. Bunun için ek
+paket gerekmez — zaten zorunlu bağımlılığımız olan `ultralytics` içinde YOLO-World ve YOLOE var;
+ağırlık listeden seçilir ve ilk çalıştırmada kendiliğinden inilir. Çıkan etiketler taslaktır,
+Labelapp'te gözden geçirilmelidir.
+
 ![Oto Label](gorseller/oto_label.png)
 
 ### ✎ Labelapp — etiketleri elle düzelt / tamamla
@@ -351,6 +357,20 @@ kaçırılmış nesneyi çizmekten kolaydır. İlk turda hazır bir COCO modeli 
 Kutu çizme, taşıma ve sınıf atama arayüzü. Oto Label'ın ürettiklerini gözden geçirmek ve eksikleri
 tamamlamak için. Klavye kısayollarıyla hızlı gezinme (A/D ile önceki/sonraki kare), sınıf yönetimi
 ve uygulama içinden eğitim başlatma da burada.
+
+- **Yakınlaştırma ve kaydırma** — fare tekerleği imlecin altındaki pikseli sabit tutarak
+  yakınlaştırır, sağ tuşla sürükleyerek kaydırılır, `Ctrl+0` sığdırır. 1080p bir karede 30
+  piksellik bir nesneye sıkı kutu çizmek bunsuz mümkün değildi.
+- **Kılavuz çizgileri** — imleci takip eden hizalama çizgileri; kutunun uzak kenarının nereye
+  denk geldiği tahmine kalmıyor.
+- **Geri al / yinele** — `Ctrl+Z` / `Ctrl+Y`, kare başına 100 adım.
+- **Sınıf paneli kutunun üstünde** — kutu çizince sınıf oracıkta yazılır; olmayan bir ad
+  yazılırsa sınıf o anda yaratılır. Son kullanılan sınıf yapışkandır, sonraki kutular onunla
+  gelir. `1`–`9` tuşları sınıfı seçer, bir kutu seçiliyse onun sınıfını değiştirir.
+- **Küçük resim ızgarası** — kareler arka planda üretilen küçük resimlerle listelenir;
+  etiketlisi yeşil, etiketsizi soluk. Düz liste görünümüne geçilebilir.
+- **Araç rayı** — geri al, yakınlaştırma ve Kutuları Taşı sağdaki dikey rayda; yıkıcı olan
+  **Görseli Sil** en altta, ayrı durur.
 
 ![Labelapp](gorseller/labelapp.png)
 
@@ -442,6 +462,16 @@ Hata Analizi ve Model Karşılaştır'a girer, oradan gelen bilgiyle veri büyü
   taranır. Ortak sahne bulunursa örnekleriyle söylenir ve eğitim sen onaylamadan başlamaz; bu
   denetim olmadan şişik bir mAP'ye bakıp modeli iyi sanmak çok kolaydır.
 - **Durdurma** — sıradaki epoch sınırında durur, o ana kadarki en iyi ağırlık diskte kalır.
+- **Geçmiş sekmesi** — çıktı klasöründeki bütün turlar tabloda listelenir (tarih, epoch, en iyi
+  mAP50-95, başlangıç ağırlığı); birden fazla tur seçilince mAP eğrileri üst üste çizilir. Tek
+  turun eğrisi "eğitim iyi gitti mi" sorusunu cevaplıyor, asıl karar sorusu ise "bu tur bir
+  öncekinden iyi mi" — o da ancak turlar aynı eksene konunca görülüyor. Kaynağı ultralytics'in
+  her turda yazdığı `results.csv`'dir; ek paket gerektirmez.
+- **MLflow'a da kaydet** (isteğe bağlı) — açıkken parametreler, epoch metrikleri ve ağırlıklar
+  çıktı klasörünün altındaki `mlflow/` dizinine yazılır; sunucu gerekmez, incelemek için
+  `mlflow ui --backend-store-uri <çıktı>/mlflow` yeter. Kutu **kapalıyken kayıt da kapatılır**:
+  ultralytics'in MLflow geri çağrımı varsayılan olarak açıktır ve mlflow kurulu bir makinede
+  kimse istemeden kayıt tutmaya başlar.
 
 Eğitim ayrı bir süreçte değil, ayrı bir **iş parçacığında** koşar ve ilerleme stdout ayrıştırarak
 değil ultralytics'in `add_callback`'iyle alınır.
@@ -517,8 +547,9 @@ metnindeki açık palet renkleri koyu karşılıklarıyla değiştiriliyor.
   Renk körlüğü gözetilerek seçildiler ve koyu tuval üzerinde okunuyorlar; temaya göre
   değiştirmek o dengeyi bozardı. Zaten yalnızca `QColor`/`QPainter` ile kullanılıyorlar,
   dönüşüm ise sadece stil metinlerine bakıyor.
-- **Görüntü ve video tuvalleri** her iki temada da koyu kalır — kutu renkleri koyu zeminde
-  daha iyi seçilir.
+- **Görüntü ve video tuvalleri** kendi boyamasını `QPainter` ile yaptığı için stil yamasının
+  dışında kalır; zemin rengini `tema.renk()`ten isteyerek temayı yine de izlerler. Üstlerine
+  çizilen kutu ve sınıf renkleri iki temada da aynı kalır.
 
 Kendi boyamasını yapan widget'lar (ör. Eğitim'deki kayıp/mAP eğrisi) rengi `tema.renk()`
 üzerinden ister; onlar için yamalama yeterli olmaz.
