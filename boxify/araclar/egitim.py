@@ -29,7 +29,8 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QSplitter, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QFileDialog, QStatusBar, QGroupBox, QMessageBox,
     QLineEdit, QAction, QComboBox, QProgressBar, QCheckBox, QSpinBox,
-    QDoubleSpinBox, QTextEdit, QTabWidget, QScrollArea, QSizePolicy, QFrame
+    QDoubleSpinBox, QTextEdit, QTabWidget, QScrollArea, QSizePolicy, QFrame,
+    QTableWidget, QTableWidgetItem
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize
 from PyQt5.QtGui import QPainter, QColor, QPen, QFont
@@ -37,6 +38,12 @@ from PyQt5.QtGui import QPainter, QColor, QPen, QFont
 from ..tema import STYLE, renk, koyu_mu
 from ..klasor_ac import klasoru_ac
 from .model_bilgi import cihaz_combo_doldur
+
+
+def mlflow_var() -> bool:
+    """MLflow kurulu mu? (import edilmeden, yalnızca bulunabilirliğe bakılır)"""
+    import importlib.util
+    return importlib.util.find_spec("mlflow") is not None
 
 # Hazır ağırlıklar: ilk turda kendi modelin yokken buradan başlanır.
 HAZIR_MODELLER = [
@@ -184,6 +191,40 @@ class EgitimIscisi(QThread):
         if self._trainer is not None:
             self._trainer.stop = True
 
+    def _mlflow_kur(self, cfg: dict):
+        """MLflow kaydını açıkça aç ya da kapat.
+
+        ultralytics'te MLflow geri çağrımı hazır gelir ve ayarı **varsayılan
+        olarak açıktır**: mlflow kurulu bir makinede eğitim, kullanıcı hiç
+        istemeden ./mlruns altına yazmaya başlar. Bu yüzden kapalı durum da
+        açık durum kadar açıkça yazılıyor — sessiz kayıt, sürpriz demektir.
+        """
+        try:
+            from ultralytics.utils import SETTINGS
+        except Exception:
+            return
+
+        if not cfg.get("mlflow"):
+            try:
+                SETTINGS["mlflow"] = False
+            except Exception:
+                pass
+            return
+
+        depo = os.path.join(cfg["proje"], "mlflow")
+        os.makedirs(depo, exist_ok=True)
+        # Yerel dosya deposu: sunucu çalıştırmak gerekmiyor, klasör projeyle
+        # birlikte taşınıyor.
+        os.environ["MLFLOW_TRACKING_URI"] = "file:" + depo
+        os.environ["MLFLOW_EXPERIMENT_NAME"] = "boxify"
+        os.environ["MLFLOW_RUN"] = cfg["ad"]
+        try:
+            SETTINGS["mlflow"] = True
+        except Exception:
+            pass
+        self.log.emit(f"MLflow kaydı açık → {depo}")
+        self.log.emit("İncelemek için:  mlflow ui --backend-store-uri " + depo)
+
     def run(self):
         cfg = self.cfg
         t0 = time.time()
@@ -192,6 +233,8 @@ class EgitimIscisi(QThread):
         except Exception as e:
             self.failed.emit(f"ultralytics yüklenemedi: {e}")
             return
+
+        self._mlflow_kur(cfg)
 
         try:
             model = YOLO(cfg["baslangic"])
@@ -398,6 +441,162 @@ class EgriWidget(QWidget):
         p.drawText(sol, h - 8, etiket)
 
 
+# ─────────────────────────────────────────────── geçmiş turlar
+
+# Renk körlüğü gözetilen veri renkleri (tema.py'deki kuralla aynı aile)
+GECMIS_RENKLER = ["#2e6da4", "#f5c518", "#00bcd4", "#b39ddb", "#8e6bbf", "#9e9e9e"]
+
+
+def gecmis_tara(proje_dizin: str) -> list:
+    """Çıktı klasöründeki eğitim turlarını oku.
+
+    Kaynak olarak MLflow değil, ultralytics'in her turda yazdığı
+    `results.csv` kullanılıyor: o dosya her kurulumda var, MLflow ise isteğe
+    bağlı. Böylece geçmiş ekranı hiçbir ek bağımlılık istemiyor ve MLflow
+    açılmadan önce koşulmuş turlar da listede görünüyor.
+    """
+    import csv
+
+    if not proje_dizin or not os.path.isdir(proje_dizin):
+        return []
+
+    turlar = []
+    for ad in sorted(os.listdir(proje_dizin)):
+        dizin = os.path.join(proje_dizin, ad)
+        csv_yolu = os.path.join(dizin, "results.csv")
+        if not os.path.isfile(csv_yolu):
+            continue
+        try:
+            with open(csv_yolu, newline="", encoding="utf-8") as f:
+                satirlar = [{k.strip(): v for k, v in s.items() if k}
+                            for s in csv.DictReader(f)]
+        except Exception:
+            continue
+        if not satirlar:
+            continue
+
+        def sutun(*parcalar):
+            """Adında verilen parçaları geçen ilk sütunun adını döndür."""
+            for k in satirlar[0]:
+                if all(p in k for p in parcalar):
+                    return k
+            return None
+
+        map_s = sutun("mAP50-95")
+        map50_s = sutun("mAP50") if map_s is None else sutun("mAP50(")
+        egri = []
+        for i, s in enumerate(satirlar):
+            def sayi(anahtar):
+                try:
+                    return float(s[anahtar])
+                except (KeyError, TypeError, ValueError):
+                    return None
+            egri.append({"epoch": i + 1,
+                         "map": sayi(map_s) if map_s else None,
+                         "map50": sayi(map50_s) if map50_s else None})
+
+        gecerli = [n["map"] for n in egri if n["map"] is not None]
+        best = os.path.join(dizin, "weights", "best.pt")
+        baslangic = ""
+        try:
+            with open(os.path.join(dizin, "args.yaml"), encoding="utf-8") as f:
+                for satir in f:
+                    if satir.startswith("model:"):
+                        baslangic = os.path.basename(satir.split(":", 1)[1].strip())
+                        break
+        except Exception:
+            pass
+
+        turlar.append({
+            "ad": ad,
+            "dizin": dizin,
+            "tarih": time.strftime("%Y-%m-%d %H:%M",
+                                   time.localtime(os.path.getmtime(csv_yolu))),
+            "epoch": len(egri),
+            "en_iyi": max(gecerli) if gecerli else None,
+            "baslangic": baslangic,
+            "best": best if os.path.exists(best) else "",
+            "egri": egri,
+        })
+    turlar.sort(key=lambda t: t["tarih"], reverse=True)
+    return turlar
+
+
+class GecmisEgriWidget(QWidget):
+    """Seçili turların mAP50-95 eğrilerini üst üste çizer.
+
+    Tek turun eğrisi "eğitim iyi gitti mi" sorusunu cevaplıyor; asıl karar
+    sorusu ise "bu tur bir öncekinden iyi mi" — o da ancak turlar aynı eksene
+    konunca görülüyor.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._turlar = []
+        self.setMinimumHeight(170)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+    def goster(self, turlar):
+        self._turlar = turlar
+        self.update()
+
+    def paintEvent(self, _e):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        w, h = self.width(), self.height()
+        sol, sag, ust, alt = 44, 12, 14, 26
+        gw, gh = max(1, w - sol - sag), max(1, h - ust - alt)
+
+        p.fillRect(self.rect(), QColor(renk("#ffffff")))
+        p.setPen(QPen(QColor(renk("#e3e8ee")), 1))
+        for i in range(5):
+            y = ust + gh * i / 4
+            p.drawLine(sol, int(y), sol + gw, int(y))
+
+        f = QFont(); f.setPixelSize(10); p.setFont(f)
+        if not self._turlar:
+            p.setPen(QColor(renk("#8b95a3")))
+            p.drawText(self.rect(), Qt.AlignCenter,
+                       "Kıyaslamak için listeden bir ya da birkaç tur seç")
+            return
+
+        p.setPen(QColor(renk("#42505f")))
+        for i in range(5):
+            p.drawText(4, int(ust + gh * i / 4) + 4, f"{1 - i / 4:.2f}")
+
+        en_uzun = max(len(t["egri"]) for t in self._turlar)
+        for sira, tur in enumerate(self._turlar):
+            c = QColor(GECMIS_RENKLER[sira % len(GECMIS_RENKLER)])
+            noktalar = []
+            for n in tur["egri"]:
+                if n["map"] is None:
+                    continue
+                x = sol + (gw * (n["epoch"] - 1) / max(1, en_uzun - 1))
+                y = ust + gh * (1 - min(1.0, max(0.0, n["map"])))
+                noktalar.append((x, y))
+            if len(noktalar) < 2:
+                if noktalar:
+                    p.setPen(QPen(c, 2))
+                    p.drawEllipse(int(noktalar[0][0]) - 2, int(noktalar[0][1]) - 2, 4, 4)
+                continue
+            p.setPen(QPen(c, 2))
+            for a, b in zip(noktalar, noktalar[1:]):
+                p.drawLine(int(a[0]), int(a[1]), int(b[0]), int(b[1]))
+
+        # gösterge
+        x = sol
+        for sira, tur in enumerate(self._turlar):
+            c = QColor(GECMIS_RENKLER[sira % len(GECMIS_RENKLER)])
+            p.setPen(QPen(c, 2))
+            p.drawLine(int(x), h - 11, int(x) + 14, h - 11)
+            p.setPen(QColor(renk("#42505f")))
+            metin = tur["ad"]
+            p.drawText(int(x) + 19, h - 7, metin)
+            x += 19 + p.fontMetrics().width(metin) + 16
+            if x > sol + gw - 60:
+                break
+
+
 # ─────────────────────────────────────────────── ana pencere
 
 class MainWindow(QMainWindow):
@@ -408,6 +607,7 @@ class MainWindow(QMainWindow):
         self._data_yaml = ""
         self._baslangic = ""      # kendi .pt'n (boşsa hazır ağırlık adı)
         self._proje = ""
+        self._gecmis = []
         self._worker = None
         self._sizinti = None
         self._son_best = ""
@@ -610,6 +810,21 @@ class MainWindow(QMainWindow):
         self.plots_chk = QCheckBox("ultralytics grafiklerini de üret")
         self.plots_chk.setChecked(True)
         v3.addWidget(self.plots_chk)
+
+        self.mlflow_chk = QCheckBox("MLflow'a da kaydet")
+        if mlflow_var():
+            self.mlflow_chk.setToolTip(
+                "Parametreler, epoch metrikleri ve ağırlıklar çıktı klasörünün\n"
+                "altındaki mlflow/ dizinine yazılır. Sunucu gerekmez; incelemek\n"
+                "için:  mlflow ui --backend-store-uri <çıktı>/mlflow\n\n"
+                "Geçmiş sekmesi buna bağlı değildir — o, ultralytics'in kendi\n"
+                "results.csv dosyalarını okur ve MLflow kurulu olmasa da çalışır.")
+        else:
+            self.mlflow_chk.setEnabled(False)
+            self.mlflow_chk.setToolTip(
+                "MLflow kurulu değil. Kurmak için:  pip install mlflow\n"
+                "Kurulu olmaması hiçbir şeyi engellemez; Geçmiş sekmesi yine çalışır.")
+        v3.addWidget(self.mlflow_chk)
         v.addWidget(g3)
 
         v.addStretch()
@@ -695,8 +910,84 @@ class MainWindow(QMainWindow):
         self.log_box.setReadOnly(True)
         self.log_box.setStyleSheet("font-family:monospace; font-size:11px;")
         self.tabs.addTab(self.log_box, "Log")
+
+        self.tabs.addTab(self._build_gecmis(), "Geçmiş")
         v.addWidget(self.tabs, 3)
         return w
+
+    def _build_gecmis(self) -> QWidget:
+        """Geçmiş turlar: tablo + üst üste bindirilmiş mAP eğrileri."""
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.setContentsMargins(6, 6, 6, 6)
+        v.setSpacing(6)
+
+        ust = QHBoxLayout()
+        ust.setSpacing(6)
+        aciklama = QLabel("Çıktı klasöründeki turlar. Kıyaslamak için birden fazla satır seç.")
+        aciklama.setStyleSheet("color:#6b7686; font-size:11px;")
+        ust.addWidget(aciklama)
+        ust.addStretch()
+        self.gecmis_tazele_btn = QPushButton("Tazele")
+        self.gecmis_tazele_btn.setFixedWidth(80)
+        self.gecmis_tazele_btn.clicked.connect(self._gecmisi_tazele)
+        ust.addWidget(self.gecmis_tazele_btn)
+        self.gecmis_ac_btn = QPushButton("Klasörü Aç")
+        self.gecmis_ac_btn.setEnabled(False)
+        self.gecmis_ac_btn.clicked.connect(self._gecmis_klasor_ac)
+        ust.addWidget(self.gecmis_ac_btn)
+        v.addLayout(ust)
+
+        self.gecmis_tablo = QTableWidget(0, 5)
+        self.gecmis_tablo.setHorizontalHeaderLabels(
+            ["Tur", "Tarih", "Epoch", "En iyi mAP50-95", "Başlangıç"])
+        self.gecmis_tablo.setSelectionBehavior(QTableWidget.SelectRows)
+        self.gecmis_tablo.setSelectionMode(QTableWidget.ExtendedSelection)
+        self.gecmis_tablo.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.gecmis_tablo.verticalHeader().setVisible(False)
+        self.gecmis_tablo.horizontalHeader().setStretchLastSection(True)
+        self.gecmis_tablo.itemSelectionChanged.connect(self._gecmis_secim_degisti)
+        v.addWidget(self.gecmis_tablo, 2)
+
+        self.gecmis_egri = GecmisEgriWidget()
+        v.addWidget(self.gecmis_egri, 3)
+        return w
+
+    def _gecmisi_tazele(self):
+        self._gecmis = gecmis_tara(self._proje)
+        self.gecmis_tablo.setRowCount(len(self._gecmis))
+        for satir, tur in enumerate(self._gecmis):
+            degerler = [
+                tur["ad"],
+                tur["tarih"],
+                str(tur["epoch"]),
+                f"{tur['en_iyi']:.4f}" if tur["en_iyi"] is not None else "—",
+                tur["baslangic"] or "—",
+            ]
+            for sutun, metin in enumerate(degerler):
+                hucre = QTableWidgetItem(metin)
+                if sutun in (2, 3):
+                    hucre.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                self.gecmis_tablo.setItem(satir, sutun, hucre)
+        self.gecmis_tablo.resizeColumnsToContents()
+        self.gecmis_egri.goster([])
+        if not self._gecmis:
+            self.status.showMessage(
+                "Çıktı klasöründe tamamlanmış tur bulunamadı." if self._proje
+                else "Önce bir data.yaml seç — çıktı klasörü ondan belirleniyor.")
+        else:
+            self.status.showMessage(f"{len(self._gecmis)} tur bulundu.")
+
+    def _gecmis_secim_degisti(self):
+        satirlar = sorted({i.row() for i in self.gecmis_tablo.selectedItems()})
+        secili = [self._gecmis[s] for s in satirlar if s < len(self._gecmis)]
+        self.gecmis_egri.goster(secili)
+        self.gecmis_ac_btn.setEnabled(len(secili) == 1)
+
+    def _gecmis_klasor_ac(self):
+        satirlar = sorted({i.row() for i in self.gecmis_tablo.selectedItems()})
+        if len(satirlar) == 1 and satirlar[0] < len(self._gecmis):
+            klasoru_ac(self._gecmis[satirlar[0]]["dizin"])
 
     def _build_menu(self):
         m = self.menuBar().addMenu("Dosya")
@@ -753,6 +1044,7 @@ class MainWindow(QMainWindow):
             self._proje = os.path.join(os.path.dirname(os.path.abspath(p)), "runs")
             self.out_edit.setText(self._proje)
             self.out_edit.setCursorPosition(0)
+        self._gecmisi_tazele()
 
     def _on_kendi_toggled(self, on: bool):
         self.model_edit.setEnabled(on)
@@ -777,6 +1069,7 @@ class MainWindow(QMainWindow):
         self._proje = d
         self.out_edit.setText(d)
         self.out_edit.setCursorPosition(0)
+        self._gecmisi_tazele()
 
     def _open_out(self):
         hedef = self._son_calisma or self._proje
@@ -896,6 +1189,7 @@ class MainWindow(QMainWindow):
             "save_period": self.save_period_spin.value(),
             "resume": self.resume_chk.isChecked() and self.kendi_chk.isChecked(),
             "plots": self.plots_chk.isChecked(),
+            "mlflow": self.mlflow_chk.isChecked() and self.mlflow_chk.isEnabled(),
             "proje": self._proje,
             "ad": ad,
         }
@@ -952,6 +1246,8 @@ class MainWindow(QMainWindow):
         self._son_calisma = r.get("dizin", "")
         self.open_btn.setEnabled(bool(self._son_calisma))
         self.copy_btn.setEnabled(bool(self._son_best))
+        # Biten tur geçmişte hemen görünsün — asıl soru "bu tur öncekinden iyi mi"
+        self._gecmisi_tazele()
 
         dk = r.get("sure", 0) / 60
         sat = ["═══ EĞİTİM ÖZETİ ═══", ""]
