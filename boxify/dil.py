@@ -1043,6 +1043,38 @@ SOZLUK = {
         "objects to find, comma separated: forklift, helmet, pallet",
     "Ağırlık": "Weights",
     "Dayanıklılık koşusu": "Endurance run",
+    # ── İlgi alanı (ROI) ──
+    "Yalnızca ilgi alanı (ROI) içi": "Region of interest (ROI) only",
+    "Çiz…": "Draw…",
+    "İlgi Alanı (ROI)": "Region of Interest (ROI)",
+    "Bölgeyi Kapat": "Close Region",
+    "Hepsini Temizle": "Clear All",
+    "ROI yok — bütün kare kullanılıyor": "No ROI — the whole frame is used",
+    "Önce fotoğraf klasörü seç.": "Choose a photo folder first.",
+    "Görsel yok": "No image",
+    "Kare açılamadı": "Frame could not be opened",
+    "Kaydedilemedi": "Could not save",
+    "Açıkken merkezi ROI dışında kalan tespitler yazılmaz.\n"
+    "Kameranın gördüğü alanın çoğu zaman yarısı alakasızdır (komşu hat,\n"
+    "koridor); oradaki tespitler veri setine gürültü olarak girer.":
+        "When on, detections whose centre falls outside the ROI are not written.\n"
+        "Half of what the camera sees is often irrelevant (the neighbouring line,\n"
+        "a corridor); detections there enter the dataset as noise.",
+    "Sol tık nokta koyar · çift tık ya da Enter bölgeyi kapatır · "
+    "sağ tık son noktayı geri alır · Esc çizimi bırakır\n"
+    "Karartılan alan ROI dışıdır: oradaki tespitler kullanılmaz.":
+        "Left click adds a point · double click or Enter closes the region · "
+        "right click undoes the last point · Esc abandons the drawing\n"
+        "The darkened area is outside the ROI: detections there are unused.",
+    "Örnek kare yok — önce bir görsel klasörü seç":
+        "No sample frame — choose an image folder first",
+    "Önce fotoğraf klasörünü seç — ROI bir örnek karenin üstüne çizilir.":
+        "Choose the photo folder first — the ROI is drawn on a sample frame.",
+    "ROI dosyası yazılamadı — klasör yazılabilir mi?":
+        "The ROI file could not be written — is the folder writable?",
+    "Son noktayı ya da son bölgeyi geri alır":
+        "Undoes the last point, or the last region",
+    "Enter ile aynı": "Same as Enter",
     "0 = normal hız ölçümü (tekrar sayısı kadar koşar).\n\n"
     "0'dan büyükse dayanıklılık koşusu: model bu süre boyunca aralıksız\n"
     "çalışır, bellek/takas/sıcaklık örneklenir ve sonunda bir\n"

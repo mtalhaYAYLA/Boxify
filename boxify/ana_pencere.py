@@ -18,7 +18,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QPixmap
 
-from . import SURUM
+from . import SURUM, YAZAR
 from .araclar import ARACLAR, arac_bul
 from .dil import tr, aktif_dil, dil_kaydet
 from .tema import aktif_tema, tema_kaydet
@@ -47,7 +47,8 @@ class AnaPencere(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(
-            f"Boxify {SURUM} — " + tr("Nesne Tespiti Veri ve Model Atölyesi"))
+            f"Boxify {SURUM} — " + tr("Nesne Tespiti Veri ve Model Atölyesi")
+            + f" — {YAZAR}")
         self.resize(1500, 920)
 
         self._sayfa_no = {}      # anahtar -> stack indeksi
@@ -99,7 +100,7 @@ class AnaPencere(QMainWindow):
         ad_kutu.setSpacing(3)
         ad = QLabel("Boxify")
         ad.setObjectName("LogoAd")
-        surum = QLabel(tr("sürüm") + f" {SURUM}")
+        surum = QLabel(tr("sürüm") + f" {SURUM}  ·  {YAZAR}")
         surum.setObjectName("Surum")
         surum_kutu = QHBoxLayout()
         surum_kutu.addWidget(surum)

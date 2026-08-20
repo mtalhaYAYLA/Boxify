@@ -484,6 +484,85 @@ def dayaniklilik_olcum_testi(r, app):
     w.close()
 
 
+def roi_testi(r, app):
+    """İlgi alanı: geometri, kalıcılık ve Oto Label süzgeci."""
+    from boxify.araclar import roi as R
+    from PyQt5.QtGui import QPixmap
+
+    kare = [(0.2, 0.2), (0.8, 0.2), (0.8, 0.8), (0.2, 0.8)]
+    r.kontrol(R.icinde_mi([kare], 0.5, 0.5), "poligon içindeki nokta bulunuyor")
+    r.kontrol(not R.icinde_mi([kare], 0.05, 0.05), "dışardaki nokta eleniyor")
+    r.kontrol(R.icinde_mi([], 0.01, 0.99),
+              "ROI yokken kısıt uygulanmıyor (bütün kare geçerli)")
+
+    ucgen = [(0.0, 0.0), (1.0, 0.0), (0.0, 1.0)]
+    r.kontrol(R.nokta_icinde(ucgen, 0.2, 0.2) and not R.nokta_icinde(ucgen, 0.9, 0.9),
+              "dikdörtgen olmayan poligon da doğru çalışıyor")
+    r.kontrol(not R.nokta_icinde([(0, 0), (1, 1)], 0.5, 0.5),
+              "üç noktadan az poligon geçersiz")
+
+    iki = [kare, [(0.0, 0.9), (0.1, 0.9), (0.1, 1.0), (0.0, 1.0)]]
+    r.kontrol(R.icinde_mi(iki, 0.05, 0.95),
+              "birden çok bölgeden herhangi biri yeterli")
+
+    # piksel kutusu → merkez ölçütü
+    r.kontrol(R.kutu_gecerli([kare], (300, 300, 500, 500), 1000, 1000),
+              "merkezi içeride olan kutu geçiyor")
+    r.kontrol(not R.kutu_gecerli([kare], (0, 0, 100, 100), 1000, 1000),
+              "merkezi dışarıda olan kutu eleniyor")
+
+    kok = tempfile.mkdtemp(prefix="boxify_roi_")
+    try:
+        yol = R.kaydet(kok, [kare])
+        r.kontrol(bool(yol) and os.path.exists(yol), "ROI diske yazılıyor")
+        geri = R.yukle(kok)
+        r.kontrol(len(geri) == 1 and len(geri[0]) == 4,
+                  "ROI geri okunuyor", R.ozet(geri))
+        with open(os.path.join(kok, "roi.json"), "w") as f:
+            f.write("{bozuk")
+        r.kontrol(R.yukle(kok) == [],
+                  "bozuk ROI dosyası çökertmiyor, kısıtsız sayılıyor")
+        r.kontrol(R.yukle(tempfile.mkdtemp()) == [], "ROI yoksa boş liste")
+    finally:
+        shutil.rmtree(kok, ignore_errors=True)
+
+    # Oto Label bağlantısı
+    from boxify.araclar.oto_label import MainWindow
+    from boxify.araclar.roi_dialog import RoiDialog
+    w = MainWindow()
+    w.show()
+    r.kontrol(getattr(w, "roi_chk", None) is not None and not w.roi_chk.isChecked(),
+              "Oto Label'da ROI kutusu var ve varsayılan kapalı")
+    r.kontrol(w._roi_poligonlari() == [],
+              "kutu kapalıyken süzgeç boş")
+
+    kok2 = tempfile.mkdtemp(prefix="boxify_roi2_")
+    try:
+        R.kaydet(kok2, [kare])
+        w._img_dir = kok2
+        w.roi_chk.setChecked(True)
+        r.kontrol(len(w._roi_poligonlari()) == 1,
+                  "kutu açıkken klasördeki ROI okunuyor")
+        w._roi_ozeti_tazele()
+        r.kontrol("bölge" in w.roi_lbl.text(), "özet arayüzde gösteriliyor",
+                  w.roi_lbl.text()[:40])
+
+        d = RoiDialog(kok2, QPixmap(640, 480), None)
+        r.kontrol(len(d.tuval.poligonlar) == 1,
+                  "çizim penceresi mevcut ROI'yi yüklüyor")
+        d.tuval.hepsini_temizle()
+        d.tuval._acik = [(0.1, 0.1), (0.5, 0.1), (0.5, 0.5)]
+        d.tuval.bolgeyi_kapat()
+        r.kontrol(len(d.tuval.poligonlar) == 1 and len(d.tuval.poligonlar[0]) == 3,
+                  "üç noktalı bölge kapatılabiliyor")
+        d.tuval.son_noktayi_geri_al()
+        r.kontrol(not d.tuval.poligonlar,
+                  "geri al kapatılmış bölgeyi düzenlemeye açıyor")
+    finally:
+        shutil.rmtree(kok2, ignore_errors=True)
+    w.close()
+
+
 def main() -> int:
     r = Rapor("Geçmiş, MLflow ve sıfır-atış")
     app = QApplication.instance() or QApplication([])
@@ -497,6 +576,7 @@ def main() -> int:
     mlflow_yayilim_testi(r, app)
     kararlilik_testi(r, app)
     dayaniklilik_olcum_testi(r, app)
+    roi_testi(r, app)
     return r.bitir()
 
 

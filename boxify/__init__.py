@@ -23,3 +23,4 @@ karşılaştırma ve model export.
 
 SURUM = "4.3.0"
 UYGULAMA_ADI = "Boxify"
+YAZAR = "Talha Yayla"

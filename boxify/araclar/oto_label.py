@@ -20,6 +20,7 @@ from PyQt5.QtGui import QImage, QPixmap
 
 from ..tema import STYLE  # ortak açık tema — bkz. boxify/tema.py
 from .model_bilgi import SinifYukleyici, cihaz_combo_doldur
+from . import roi as roi_modulu
 
 IMG_EXTS = (".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff")
 
@@ -192,6 +193,12 @@ class LabelWorker(QThread):
         if cfg["save_preview_files"]:
             os.makedirs(pred_dir, exist_ok=True)
 
+        roi_poligonlari = cfg.get("roi") or []
+        roi_elenen = 0
+        if roi_poligonlari:
+            self.log.emit("ROI süzgeci açık — " + roi_modulu.ozet(roi_poligonlari)
+                          + " (merkezi dışarıda kalan tespitler yazılmaz)")
+
         stats = {"islenen": 0, "tespitli": 0, "bos": 0, "atlanan": 0, "hatali": 0,
                  "tespit_toplam": 0, "sinif": {}}
         used_stems = {}          # çıktı adı çakışmalarını engellemek için
@@ -236,6 +243,18 @@ class LabelWorker(QThread):
                     xywhn = boxes.xywhn.cpu().numpy()
                     clss = boxes.cls.cpu().numpy().astype(int)
                     confs = boxes.conf.cpu().numpy()
+                    # ROI süzgeci: ölçüt kutunun merkezi. xywhn zaten normalize
+                    # olduğu için görüntü boyutuna bakmaya gerek yok.
+                    if roi_poligonlari:
+                        secim = [i for i, (x, y, _w, _h) in enumerate(xywhn)
+                                 if roi_modulu.kutu_gecerli_normal(
+                                     roi_poligonlari, float(x), float(y))]
+                        if len(secim) != len(xywhn):
+                            roi_elenen += len(xywhn) - len(secim)
+                        xywhn = xywhn[secim]
+                        clss = clss[secim]
+                        confs = confs[secim]
+                        n = len(secim)
                     for (x, y, w, h), c, cf in zip(xywhn, clss, confs):
                         if cfg["save_conf"]:
                             lines.append(f"{c} {x:.6f} {y:.6f} {w:.6f} {h:.6f} {cf:.4f}")
@@ -293,6 +312,9 @@ class LabelWorker(QThread):
                 self.log.emit(f"HATA — data.yaml yazılamadı: {e}")
 
         stats["iptal"] = self._cancel
+        stats["roi_elenen"] = roi_elenen
+        if roi_elenen:
+            self.log.emit(f"ROI dışında kaldığı için {roi_elenen} tespit yazılmadı.")
         self.summary.emit(stats)
 
 
@@ -512,6 +534,26 @@ class MainWindow(QMainWindow):
         self.recursive_chk = QCheckBox("Alt klasörleri de tara")
         self.recursive_chk.toggled.connect(self._rescan_images)
         gi.addWidget(self.recursive_chk)
+
+        roi_satir = QHBoxLayout()
+        roi_satir.setSpacing(6)
+        self.roi_chk = QCheckBox("Yalnızca ilgi alanı (ROI) içi")
+        self.roi_chk.setToolTip(
+            "Açıkken merkezi ROI dışında kalan tespitler yazılmaz.\n"
+            "Kameranın gördüğü alanın çoğu zaman yarısı alakasızdır (komşu hat,\n"
+            "koridor); oradaki tespitler veri setine gürültü olarak girer.")
+        self.roi_chk.toggled.connect(self._roi_ozeti_tazele)
+        roi_satir.addWidget(self.roi_chk)
+        self.roi_btn = QPushButton("Çiz…")
+        self.roi_btn.setFixedWidth(70)
+        self.roi_btn.clicked.connect(self._roi_ciz)
+        roi_satir.addWidget(self.roi_btn)
+        gi.addLayout(roi_satir)
+
+        self.roi_lbl = QLabel()
+        self.roi_lbl.setStyleSheet("color:#6b7686; font-size:11px;")
+        self.roi_lbl.setWordWrap(True)
+        gi.addWidget(self.roi_lbl)
         v.addWidget(grp_i)
 
         # ── Çıktı
@@ -662,6 +704,42 @@ class MainWindow(QMainWindow):
     def _log(self, text: str):
         self.log_box.append(text)
 
+    def _roi_poligonlari(self) -> list:
+        """Seçili klasörün ROI'si (kutu kapalıysa boş = kısıt yok)."""
+        if not (self.roi_chk.isChecked() and self._img_dir):
+            return []
+        return roi_modulu.yukle(self._img_dir)
+
+    def _roi_ozeti_tazele(self, *_):
+        if not self._img_dir:
+            self.roi_lbl.setText("Önce fotoğraf klasörü seç.")
+            return
+        poligonlar = roi_modulu.yukle(self._img_dir)
+        ozet = roi_modulu.ozet(poligonlar)
+        if self.roi_chk.isChecked() and not poligonlar:
+            ozet += "  —  çizilmemiş, süzgeç uygulanmayacak"
+        self.roi_lbl.setText(ozet)
+
+    def _roi_ciz(self):
+        """ROI'yi ilk görselin üstünde çiz."""
+        if not self._img_dir or not self._images:
+            QMessageBox.information(
+                self, "Görsel yok",
+                "Önce fotoğraf klasörünü seç — ROI bir örnek karenin üstüne çizilir.")
+            return
+        kare = QPixmap(self._images[0])
+        if kare.isNull():
+            QMessageBox.warning(self, "Kare açılamadı",
+                                f"Örnek kare okunamadı:\n{self._images[0]}")
+            return
+        from .roi_dialog import RoiDialog
+        d = RoiDialog(self._img_dir, kare, self)
+        if d.exec_():
+            self._roi_ozeti_tazele()
+            self._log("ROI kaydedildi: " + roi_modulu.ozet(d.poligonlar()))
+            if d.poligonlar() and not self.roi_chk.isChecked():
+                self.roi_chk.setChecked(True)
+
     def _zs_agirlik(self) -> str:
         """Seçilen ya da elle yazılan açık sözlük ağırlığı ('' = dosyayı kullan)."""
         idx = self.zs_model_combo.currentIndex()
@@ -755,6 +833,7 @@ class MainWindow(QMainWindow):
         self._rescan_images()
 
     def _rescan_images(self):
+        # ROI dosyası klasörün yanında durur; klasör değişince özet de değişir
         if not self._img_dir:
             return
         self._images = list_images(self._img_dir, self.recursive_chk.isChecked())
@@ -764,6 +843,7 @@ class MainWindow(QMainWindow):
             it.setData(Qt.UserRole, p)
             it.setToolTip(p)
             self.file_list.addItem(it)
+        self._roi_ozeti_tazele()
         self.file_count_lbl.setText(f"{len(self._images)} görsel")
         self.status.showMessage(f"{len(self._images)} görsel bulundu: {self._img_dir}")
         if self._images:
@@ -874,6 +954,7 @@ class MainWindow(QMainWindow):
             "save_conf": self.conf_col_chk.isChecked(),
             "show_preview": self.show_preview_chk.isChecked(),
             "prompt": self.zs_edit.text().strip() if self.zs_chk.isChecked() else "",
+            "roi": self._roi_poligonlari(),
         }
 
         self.log_box.clear()

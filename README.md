@@ -357,6 +357,12 @@ eklenir. Yine de Grounding DINO yolundan hafiftir: `transformers`, `sentencepiec
 
 Çıkan etiketler taslaktır, Labelapp'te gözden geçirilmelidir.
 
+**İlgi alanı (ROI)** — kameranın gördüğü alanın çoğu zaman yarısı alakasızdır: komşu hat, koridor,
+tavan. "Çiz…" ile örnek karenin üstüne poligon çizilir; merkezi ROI dışında kalan tespitler
+yazılmaz. Poligon, dikdörtgen değil — hat çoğu zaman çapraz geçer ve dikdörtgen ya komşu hattı
+içeri alır ya kendi hattının ucunu keser. Koordinatlar 0-1 normalize saklanır, yani ROI 1080p
+önizlemede çizilip 4K kayıtta kullanılabilir. Dosya (`roi.json`) veri setinin yanında durur.
+
 ![Oto Label](gorseller/oto_label.png)
 
 ### ✎ Labelapp — etiketleri elle düzelt / tamamla
