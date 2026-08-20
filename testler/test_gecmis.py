@@ -243,6 +243,59 @@ def acik_sozluk_yukleyici_testi(r, app):
               type(model2).__name__)
 
 
+def model_secici_testi(r, app):
+    """Model listesi iki eğitim ekranında da aynı ve tam mı?"""
+    from boxify.araclar.model_secici import (ModelSecici, model_listesi,
+                                             ailelere_ayir, GOMULU_MODELLER)
+
+    adlar = model_listesi()
+    r.kontrol(len(adlar) > 100, "model listesi kapsamlı", f"{len(adlar)} ağırlık")
+    r.kontrol(len(GOMULU_MODELLER) == len(adlar) or len(GOMULU_MODELLER) > 100,
+              "ultralytics yokken de tam liste var (gömülü kopya)",
+              f"gömülü {len(GOMULU_MODELLER)}")
+    r.kontrol(not any("sam" in a.lower() for a in adlar),
+              "SAM ailesi dışarıda (tespit eğitiminde başlangıç olamaz)")
+
+    gruplar = ailelere_ayir(adlar)
+    r.kontrol(len(gruplar) >= 8, "aileler ayrıştırılıyor",
+              ", ".join(list(gruplar)[:8]))
+    r.kontrol(list(gruplar)[0] == "yolo11",
+              "ilk aile yolo11 (ilk tur için önerilen)", list(gruplar)[0])
+    for aile in ("yolo11", "yolo26", "yolov8"):
+        if aile in gruplar:
+            r.kontrol(gruplar[aile][0].endswith("n.pt") or "n" in gruplar[aile][0],
+                      f"{aile} içinde en küçük boyut başta", gruplar[aile][0])
+
+    s = ModelSecici()
+    r.kontrol(s.model_adi() == "yolo11n.pt", "varsayılan yolo11n.pt",
+              s.model_adi())
+    i = s.aile_combo.findData("rtdetr")
+    if i >= 0:
+        s.aile_combo.setCurrentIndex(i)
+        r.kontrol(s.model_adi().startswith("rtdetr"),
+                  "aile değişince sürüm listesi de değişiyor", s.model_adi())
+    s.surum_combo.setEditText("/bir/yol/kendi_modelim.pt")
+    r.kontrol(s.model_adi() == "/bir/yol/kendi_modelim.pt",
+              "listede olmayan dosya yolu kabul ediliyor")
+    s.surum_combo.setEditText("yolo26x")
+    r.kontrol(s.model_adi() == "yolo26x.pt", "uzantısız ada .pt ekleniyor")
+
+    # iki eğitim ekranı da aynı seçiciyi kullanmalı
+    from boxify.araclar.egitim import MainWindow as EgitimPenceresi
+    from boxify.araclar.labelapp.ui.training_dialog import TrainingDialog
+    from boxify.araclar.labelapp.core.dataset import Dataset
+    eg = EgitimPenceresi()
+    dlg = TrainingDialog(Dataset())
+    r.kontrol(isinstance(eg.hazir_combo, ModelSecici)
+              and isinstance(dlg.model_cb, ModelSecici),
+              "iki eğitim ekranı da ortak seçiciyi kullanıyor")
+    r.kontrol(eg.hazir_combo.aile_combo.count() == dlg.model_cb.aile_combo.count(),
+              "iki ekranda aynı aile listesi",
+              f"{eg.hazir_combo.aile_combo.count()} / {dlg.model_cb.aile_combo.count()}")
+    eg.close()
+    dlg.close()
+
+
 def main() -> int:
     r = Rapor("Geçmiş, MLflow ve sıfır-atış")
     app = QApplication.instance() or QApplication([])
@@ -252,6 +305,7 @@ def main() -> int:
     mlflow_testi(r, app)
     sifir_atis_testi(r, app)
     acik_sozluk_yukleyici_testi(r, app)
+    model_secici_testi(r, app)
     return r.bitir()
 
 

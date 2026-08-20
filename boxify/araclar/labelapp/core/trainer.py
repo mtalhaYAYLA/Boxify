@@ -20,15 +20,18 @@ class TrainerThread(QThread):
         self._process = None
 
     def run(self):
+        # Metinler repr() ile gömülüyor: model artık bir dosya yolu da olabiliyor
+        # ve r'...' biçimi, yolunda tek tırnak olan bir klasörde (Ali'nin kayitlari)
+        # üretilen betiği sözdizimi hatasına düşürüyordu.
         script = f"""
 from ultralytics import YOLO
-model = YOLO('{self.model}.pt')
+model = YOLO({self.model!r})
 model.train(
-    data=r'{self.yaml_path}',
-    epochs={self.epochs},
-    batch={self.batch},
-    imgsz={self.imgsz},
-    project=r'{self.out_dir}',
+    data={self.yaml_path!r},
+    epochs={int(self.epochs)},
+    batch={int(self.batch)},
+    imgsz={int(self.imgsz)},
+    project={self.out_dir!r},
     name='train',
     exist_ok=True,
     verbose=True,

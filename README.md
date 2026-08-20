@@ -461,12 +461,18 @@ Hata Analizi ve Model Karşılaştır'a girer, oradan gelen bilgiyle veri büyü
 - **Kendi modelinden devam** — başlangıç ağırlığı hazır bir isim ya da senin herhangi bir
   `.pt`'n olabilir. İkinci turdan itibaren doğrusu, önceki turun `best.pt`'sini seçmektir;
   sıfırdan eğitmek öğrenileni atmaktır.
-- **Ağırlık listesi kısıtlı değil** — hazır ağırlıklar elle yazılmış bir listeden değil,
-  **ultralytics'in kendi indirilebilir ağırlık listesinden** gelir (bu sürümde 165 ağırlık:
-  yolov3/v5/v6/v8/v9/v10, yolo11, yolo12, yolo26, RT-DETR, YOLO-NAS…). Yeni bir model ailesi
-  çıktığında liste kendiliğinden güncellenir. Tespit modelleri başta, diğer görevler (poz,
-  segmentasyon, sınıflandırma, yönlü kutu) parantezle işaretlenmiş hâlde sonra gelir. Alan
-  ayrıca **yazılabilir**: listede olmayan bir ad ya da dosya yolu da verilebilir.
+- **Ağırlık seçimi iki kademeli ve kısıtsız** — önce **aile** (yolo11, yolo12, yolo26, yolov8,
+  yolov10, yolov9, yolov5, yolov3, RT-DETR, YOLO-NAS, YOLOE), sonra o ailenin **sürümü**.
+  165 ağırlığı tek bir açılır listeye sığdırmak kaydırarak aramak demekti.
+
+  Liste elle yazılmıyor: **ultralytics'in kendi indirilebilir ağırlık listesinden** gelir, yani
+  yeni bir aile çıktığında kendiliğinden güncellenir. Her ailede sade model başta, özel türevler
+  ve tespit dışı görevler (poz, segmentasyon, sınıflandırma, yönlü kutu) parantezle işaretlenip
+  sonra gelir. Sürüm alanı **yazılabilir**: listede olmayan bir ad ya da doğrudan bir dosya yolu
+  da verilebilir.
+
+  Aynı seçici Labelapp'in eğitim penceresinde de kullanılır — orada ayrı bir on isimlik liste
+  vardı ve kullanıcı aynı uygulamada iki farklı model listesi görüyordu.
 - **Cihaz seçimi** — Apple donanımında MPS, NVIDIA'da CUDA, ya da CPU.
 - **Erken durdurma, katman dondurma, resume, ara kayıt, optimizer, lr, tohum.**
 - **Canlı eğri** — kayıp (mavi, düz) ve mAP50-95 (kehribar, kesikli) epoch epoch çizilir; son
