@@ -361,6 +361,49 @@ def mlflow_yayilim_testi(r, app):
         shutil.rmtree(kok, ignore_errors=True)
 
 
+def kararlilik_testi(r, app):
+    """Hız ölçümünün kuyruk ve sürüklenme ölçüleri doğru mu?
+
+    Bu ölçüler kendi jetson_test_pack deposundaki yöntemden alındı: pasif
+    soğutmalı kartlarda sorun ortalamada değil, arada gelen sivrilmelerde ve
+    ısındıkça yavaşlamada çıkıyor.
+    """
+    from boxify.araclar.model_export import kararlilik, yuzdelik
+
+    r.kontrol(yuzdelik([], 95) == 0.0 and kararlilik([]) == {},
+              "boş ölçüm çökertmiyor")
+    r.kontrol(abs(yuzdelik([1, 2, 3, 4, 5], 50) - 3.0) < 1e-9,
+              "yüzdelik medyanı doğru veriyor")
+    r.kontrol(abs(yuzdelik([1, 2, 3, 4, 5], 100) - 5.0) < 1e-9,
+              "en üst yüzdelik en büyük değer")
+
+    # sabit hızlı cihaz: sürüklenme ~0, sivrilme yok
+    sabit = [10.0 + (i % 3) * 0.1 for i in range(300)]
+    k = kararlilik(sabit)
+    r.kontrol(abs(k["suruklenme"]) < 2.0,
+              "kararlı cihazda sürüklenme yok", f"%{k['suruklenme']:.1f}")
+    r.kontrol(k["sivrilme"] == 0, "kararlı cihazda sivrilme yok")
+
+    # ısınan cihaz: süre zamanla artıyor + iki sivrilme
+    isinan = [10.0 + i * 0.03 for i in range(300)]
+    isinan[50] = 45.0
+    isinan[180] = 60.0
+    k2 = kararlilik(isinan)
+    r.kontrol(k2["suruklenme"] > 15.0,
+              "ısınan cihazda sürüklenme yakalanıyor", f"%{k2['suruklenme']:.1f}")
+    r.kontrol(k2["sivrilme"] == 2, "sivrilmeler sayılıyor", str(k2["sivrilme"]))
+    r.kontrol(k2["en_kotu"] == 60.0, "en kötü kare bildiriliyor")
+    r.kontrol(len(k2["pencereler"]) == 6 and
+              k2["pencereler"][-1] > k2["pencereler"][0],
+              "pencereler zaman sırasında ve yavaşlamayı gösteriyor")
+    r.kontrol(k2["p99"] < k2["en_kotu"],
+              "p99 en kötüden küçük (kuyruk ayrıştırılıyor)")
+
+    # "sapma" adı dönüşüm sapmasına ait; standart sapma ayrı anahtarda olmalı
+    r.kontrol("sapma" not in k2 and "standart_sapma" in k2,
+              "standart sapma dönüşüm sapmasıyla çakışmıyor")
+
+
 def main() -> int:
     r = Rapor("Geçmiş, MLflow ve sıfır-atış")
     app = QApplication.instance() or QApplication([])
@@ -372,6 +415,7 @@ def main() -> int:
     acik_sozluk_yukleyici_testi(r, app)
     model_secici_testi(r, app)
     mlflow_yayilim_testi(r, app)
+    kararlilik_testi(r, app)
     return r.bitir()
 
 

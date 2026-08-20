@@ -132,6 +132,55 @@ class ExportWorker(QThread):
 
 # ─────────────────────────────────────────────── hız ölçümü
 
+SIVRILME_KATI = 2.0    # medyanın bu katını aşan kare "sivrilme" sayılır
+PENCERE_SAYISI = 6     # sürüklenme için koşunun bölüneceği eşit pencere
+
+
+def yuzdelik(degerler, q: float) -> float:
+    """q. yüzdelik (numpy'siz, doğrusal aradeğerlemeli)."""
+    if not degerler:
+        return 0.0
+    s = sorted(degerler)
+    if len(s) == 1:
+        return s[0]
+    konum = (q / 100.0) * (len(s) - 1)
+    alt = int(konum)
+    ust = min(alt + 1, len(s) - 1)
+    return s[alt] + (s[ust] - s[alt]) * (konum - alt)
+
+
+def kararlilik(sureler) -> dict:
+    """Ortalamanın söylemediğini söyleyen ölçüler.
+
+    Ortalama ve p95, ısınmış ve sabit bir makinede yeterli. Gerçek dağıtım
+    donanımında (özellikle Jetson gibi pasif soğutmalı kartlarda) sorun
+    ortalamada değil kuyruğunda çıkıyor: arada bir gelen sivrilmeler ve
+    ısındıkça yavaşlama. Bu ikisi ölçülmezse ölçüm iyi görünüp sahada
+    tutmuyor.
+
+    - p99 / en_kotu / standart_sapma: kuyruk ne kadar uzun
+    - sivrilme: medyanın iki katını aşan kare sayısı
+    - suruklenme: koşuyu eşit pencerelere bölüp her birinin p50'si; son
+      pencere ilkinden belirgin yüksekse ısınma/kısıtlama var demektir
+    """
+    if not sureler:
+        return {}
+    ortanca = statistics.median(sureler)
+    pencere_boyu = max(1, len(sureler) // PENCERE_SAYISI)
+    pencereler = [statistics.median(sureler[i:i + pencere_boyu])
+                  for i in range(0, len(sureler), pencere_boyu)][:PENCERE_SAYISI]
+    return {
+        "p99": yuzdelik(sureler, 99),
+        "en_kotu": max(sureler),
+        # "sapma" adı bu satırda zaten dönüşüm sapmasına ait; karışmasın
+        "standart_sapma": statistics.pstdev(sureler) if len(sureler) > 1 else 0.0,
+        "sivrilme": sum(1 for v in sureler if v > ortanca * SIVRILME_KATI),
+        "pencereler": pencereler,
+        "suruklenme": (pencereler[-1] / pencereler[0] - 1.0) * 100.0
+                      if len(pencereler) > 1 and pencereler[0] > 0 else 0.0,
+    }
+
+
 class BenchWorker(QThread):
     log = pyqtSignal(str)
     progress = pyqtSignal(int, int)
@@ -228,10 +277,11 @@ class BenchWorker(QThread):
                 "post": statistics.mean(post) if post else 0.0,
                 "toplam": statistics.mean(wall),
                 "medyan": statistics.median(wall),
-                "p95": sorted(wall)[int(0.95 * (len(wall) - 1))],
+                "p95": yuzdelik(wall, 95),
                 "fps": 1000.0 / statistics.mean(wall),
                 "n": len(wall),
             }
+            row.update(kararlilik(wall))
             if cfg["compare"]:
                 if mi == 0:
                     ref_preds = preds
@@ -799,6 +849,32 @@ class MainWindow(QMainWindow):
                      f"{r['toplam']:>9.1f}{r['p95']:>8.1f}{r['fps']:>8.1f}")
         L.append("(süreler ms/kare, ortalama; p95 = en yavaş %5'in eşiği)")
         L.append("")
+
+        # Kuyruk ve kararlılık: ortalama iyi görünüp sahada tutmayan ölçümleri
+        # yakalayan kısım. Jetson gibi pasif soğutmalı kartlarda sorun
+        # ortalamada değil, arada gelen sivrilmelerde ve ısındıkça yavaşlamada.
+        if any("p99" in r for r in rows):
+            L.append("── Kararlılık (kuyruk ve sürüklenme) ──")
+            L.append(f"{'model':<28s}{'p95':>8s}{'p99':>8s}{'en kötü':>9s}"
+                     f"{'±std':>8s}{'sivrilme':>10s}{'sürüklenme':>12s}")
+            for r in rows:
+                if "p99" not in r:
+                    continue
+                L.append(f"{os.path.basename(r['model'])[:27]:<28s}"
+                         f"{r['p95']:>8.1f}{r['p99']:>8.1f}{r['en_kotu']:>9.1f}"
+                         f"{r['standart_sapma']:>8.1f}{r['sivrilme']:>10d}"
+                         f"{r['suruklenme']:>11.1f}%")
+            L.append("sivrilme = medyanın 2 katını aşan kare sayısı")
+            L.append("sürüklenme = son pencerenin ilk pencereye göre yavaşlaması")
+            uyari = [r for r in rows if r.get("suruklenme", 0) > 15]
+            if uyari:
+                L.append("")
+                L.append("!! Sürüklenme %15'i aştı: " + ", ".join(
+                    os.path.basename(r["model"]) for r in uyari))
+                L.append("   Bu genellikle ısınma/kısıtlamadır. Ölçümü soğuk cihazda")
+                L.append("   tekrarla; sahadaki sürekli hız ilk pencereninki değil,")
+                L.append("   son pencereninkidir.")
+            L.append("")
 
         base = rows[0]
         if len(rows) > 1:

@@ -544,6 +544,13 @@ orijinalden ne kadar saptığını) raporlar. Ölçümü hedef donanımda yapmak
 
 ![Model Export](gorseller/model_export.png)
 
+**Kararlılık ölçümü** — ortalama ve p95, ısınmış ve sabit bir makinede yeterli. Gerçek dağıtım
+donanımında (özellikle Jetson gibi pasif soğutmalı kartlarda) sorun ortalamada değil kuyruğunda
+çıkar. Rapor bu yüzden ayrıca **p99, en kötü kare, standart sapma, sivrilme sayısı** (medyanın iki
+katını aşan kare) ve **sürüklenme** verir: koşu eşit pencerelere bölünüp her birinin p50'si
+çıkarılır, son pencere ilkinden %15'ten fazla yüksekse rapor ısınma/kısıtlama uyarısı basar.
+Sahadaki sürekli hız ilk pencereninki değil, son pencereninkidir.
+
 ### ✦ İpuçları sayfası
 
 Genel akışın nasıl işlediği ve her aracın püf noktaları uygulamanın içinde de anlatılır
