@@ -30,6 +30,39 @@ MARK_ERR = "!"     # hata
 MARK_SKIP = "»"    # atlandı (zaten etiketli)
 
 
+# Metinle tespit edebilen ağırlıkların adında geçen ekler
+ACIK_SOZLUK_EKLERI = ("-world", "-worldv2", "yoloe")
+
+# ultralytics yoksa (arayüz onsuz da açılıyor) kullanılacak yedek liste
+YEDEK_ACIK_SOZLUK = ["yolov8s-worldv2.pt", "yolov8m-worldv2.pt",
+                     "yolov8l-worldv2.pt", "yoloe-11s-seg.pt", "yoloe-11m-seg.pt"]
+
+
+def acik_sozluk_modelleri() -> list:
+    """Metinle tespit eden ağırlıkların adları — ultralytics'in kendi listesinden.
+
+    Sıra rastgele değil: önce `yolov8s-worldv2.pt` geliyor, çünkü varsayılanın
+    küçük, hızlı ve gerçekten metin istemiyle çalışan bir model olması gerekiyor.
+    `-pf` ("prompt-free") varyantları sona atılıyor: onlar sabit bir sözlükle
+    çalışır ve yazdığın metni yok sayar — listede dururlar ama varsayılan
+    olmamalılar, yoksa "metin yazdım ama alakasız kutular çıktı" oluyor.
+    """
+    try:
+        from ultralytics.utils.downloads import GITHUB_ASSETS_NAMES
+        adlar = sorted(a for a in GITHUB_ASSETS_NAMES
+                       if a.endswith(".pt")
+                       and any(ek in a for ek in ACIK_SOZLUK_EKLERI))
+    except Exception:
+        adlar = []
+    if not adlar:
+        return list(YEDEK_ACIK_SOZLUK)
+
+    def sira(ad):
+        return (0 if ad == "yolov8s-worldv2.pt" else 2 if "-pf" in ad else 1, ad)
+
+    return sorted(adlar, key=sira)
+
+
 def out_stem(path: str, img_dir: str) -> str:
     """Çıktı dosya adı: alt klasördeki görsellere klasör yolu ön ek yapılır.
 
@@ -102,9 +135,12 @@ class LabelWorker(QThread):
 
         Neden ayrı bir yığın değil: aynı işi Grounding DINO da yapıyor ama
         transformers ve ayrı bir çeviri modeli getiriyordu. ultralytics zaten
-        zorunlu bağımlılığımız ve içinde YOLO-World ile YOLOE var — sıfır ek
-        paketle aynı yetenek. Sınıf listesi modele metin olarak verildiği için
-        hiç eğitilmemiş bir nesne de aranabiliyor.
+        zorunlu bağımlılığımız ve içinde YOLO-World ile YOLOE var.
+
+        Bedava değil ama: sınıf adlarını gömmek için CLIP gerekiyor ve
+        ultralytics onu ilk kullanımda kendisi kuruyor (~340 MB indirme).
+        Yine de Grounding DINO yolundan hafif. Sınıf listesi modele metin
+        olarak verildiği için hiç eğitilmemiş bir nesne de aranabiliyor.
         """
         ad = os.path.basename(yol).lower()
         if "yoloe" in ad:
@@ -439,14 +475,20 @@ class MainWindow(QMainWindow):
         self.zs_model_combo = QComboBox()
         # Elinde açık sözlüklü ağırlık olmayabilir; ultralytics bu adları ilk
         # çalıştırmada kendisi indiriyor, dosya seçmeye gerek kalmıyor.
-        self.zs_model_combo.addItem("yolov8s-worldv2.pt (indirilir, küçük)",
-                                    "yolov8s-worldv2.pt")
-        self.zs_model_combo.addItem("yolov8m-worldv2.pt (indirilir, daha iyi)",
-                                    "yolov8m-worldv2.pt")
-        self.zs_model_combo.addItem("yoloe-11s-seg.pt (indirilir)",
-                                    "yoloe-11s-seg.pt")
+        # Liste elle yazılmıyor: ultralytics'in indirilebilir ağırlıkları
+        # arasından metinle tespit edenler süzülüyor, böylece yeni bir model
+        # ailesi çıktığında burası kendiliğinden güncelleniyor.
+        self.zs_model_combo.setEditable(True)
+        self.zs_model_combo.setInsertPolicy(QComboBox.NoInsert)
+        for ad in acik_sozluk_modelleri():
+            etiket = ad + ("   (istemsiz — yazdığın metni yok sayar)"
+                           if "-pf" in ad else "")
+            self.zs_model_combo.addItem(etiket, ad)
         self.zs_model_combo.addItem("Yukarıdaki model kutusundaki dosyayı kullan", "")
         self.zs_model_combo.setEnabled(False)
+        self.zs_model_combo.setToolTip(
+            "Metinle tespit edebilen ağırlıklar (YOLO-World / YOLOE).\n"
+            "Listede olmayan bir ad ya da dosya yolu da yazabilirsin.")
         gz.addLayout(self._row_label("Ağırlık", self.zs_model_combo))
 
         self.zs_bilgi = QLabel(
@@ -619,6 +661,16 @@ class MainWindow(QMainWindow):
     def _log(self, text: str):
         self.log_box.append(text)
 
+    def _zs_agirlik(self) -> str:
+        """Seçilen ya da elle yazılan açık sözlük ağırlığı ('' = dosyayı kullan)."""
+        idx = self.zs_model_combo.currentIndex()
+        if idx >= 0 and self.zs_model_combo.itemText(idx) == self.zs_model_combo.currentText():
+            return self.zs_model_combo.itemData(idx) or ""
+        metin = self.zs_model_combo.currentText().strip()
+        if metin and not os.path.splitext(metin)[1]:
+            metin += ".pt"
+        return metin
+
     def _zs_degisti(self, acik: bool):
         """Metinle arama açıkken modelin kendi sınıf listesi anlamını yitirir."""
         self.zs_edit.setEnabled(acik)
@@ -768,8 +820,7 @@ class MainWindow(QMainWindow):
             return
         # Sıfır-atışta seçilen ağırlık diskte olmayabilir: ultralytics onu
         # adından indiriyor. O yüzden dosya varlığı yalnızca normal kipte aranır.
-        zs_agirlik = (self.zs_model_combo.currentData()
-                      if self.zs_chk.isChecked() else "")
+        zs_agirlik = self._zs_agirlik() if self.zs_chk.isChecked() else ""
         if not zs_agirlik and (not self._model_path
                                or not os.path.exists(self._model_path)):
             QMessageBox.warning(self, "Model yok", "Geçerli bir model (.pt) seç.")

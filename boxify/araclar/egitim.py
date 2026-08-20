@@ -46,10 +46,54 @@ def mlflow_var() -> bool:
     return importlib.util.find_spec("mlflow") is not None
 
 # Hazır ağırlıklar: ilk turda kendi modelin yokken buradan başlanır.
-HAZIR_MODELLER = [
-    "yolo11n", "yolo11s", "yolo11m", "yolo11l", "yolo11x",
-    "yolov8n", "yolov8s", "yolov8m", "yolov8l", "yolov8x",
+#
+# Liste sabit değil — ultralytics kendi indirilebilir ağırlıklarının listesini
+# tutuyor ve buradan okunuyor. Elle yazılmış on isimlik bir liste, ultralytics
+# her yeni model ailesi çıkardığında (yolo12, yolo26…) sessizce eskiyordu ve
+# kullanıcıyı olmayan bir kısıtla karşılaştırıyordu. Ayrıca alan düzenlenebilir:
+# listede olmayan bir ad ya da yol da yazılabilir.
+#
+# ultralytics kurulu değilse (arayüz onsuz da açılıyor) bu yedek liste kullanılır.
+YEDEK_MODELLER = [
+    "yolo11n.pt", "yolo11s.pt", "yolo11m.pt", "yolo11l.pt", "yolo11x.pt",
+    "yolov8n.pt", "yolov8s.pt", "yolov8m.pt", "yolov8l.pt", "yolov8x.pt",
 ]
+
+# Tespit dışı görevler (sınıflandırma, poz, segmentasyon, yönlü kutu). Boxify'ın
+# veri biçimi YOLO tespit kutusudur; bunlar listede kalır ama sona alınır ve
+# etiketlenir — gizlemek yerine ne oldukları söyleniyor.
+GOREV_EKLERI = {
+    "-cls": "sınıflandırma", "-pose": "poz", "-seg": "segmentasyon",
+    "-obb": "yönlü kutu", "-world": "metinle tespit", "-worldv2": "metinle tespit",
+}
+
+
+def _model_gorevi(ad: str) -> str:
+    for ek, gorev in GOREV_EKLERI.items():
+        if ek in ad:
+            return gorev
+    return ""
+
+
+def hazir_modeller() -> list:
+    """(ad, açıklama) çiftleri — tespit modelleri önce, diğer görevler sonra."""
+    try:
+        from ultralytics.utils.downloads import GITHUB_ASSETS_NAMES
+        adlar = sorted(a for a in GITHUB_ASSETS_NAMES if a.endswith(".pt"))
+    except Exception:
+        adlar = list(YEDEK_MODELLER)
+    if not adlar:
+        adlar = list(YEDEK_MODELLER)
+
+    tespit, digerleri = [], []
+    for ad in adlar:
+        # SAM ailesi istem tabanlı segmentasyondur; tespit eğitiminde
+        # başlangıç ağırlığı olarak kullanılamaz.
+        if "sam" in ad.lower():
+            continue
+        gorev = _model_gorevi(ad)
+        (digerleri if gorev else tespit).append((ad, gorev))
+    return tespit + digerleri
 
 
 # ─────────────────────────────────────────────── sızıntı denetimi
@@ -698,8 +742,25 @@ class MainWindow(QMainWindow):
         g1 = QGroupBox("Başlangıç ağırlığı")
         v1 = QVBoxLayout(g1)
         self.hazir_combo = QComboBox()
-        self.hazir_combo.addItems(HAZIR_MODELLER)
-        self.hazir_combo.setCurrentText("yolo11n")
+        # Düzenlenebilir: listede olmayan bir ağırlık adı ya da yol da
+        # yazılabilsin. ultralytics adından indirebiliyor; listeyi tek doğru
+        # kaynak saymak gereksiz bir kısıt olurdu.
+        self.hazir_combo.setEditable(True)
+        self.hazir_combo.setInsertPolicy(QComboBox.NoInsert)
+        for ad, gorev in hazir_modeller():
+            self.hazir_combo.addItem(f"{ad}   ({gorev})" if gorev else ad, ad)
+        tamamlayici = self.hazir_combo.completer()
+        if tamamlayici is not None:
+            tamamlayici.setCaseSensitivity(Qt.CaseInsensitive)
+            tamamlayici.setFilterMode(Qt.MatchContains)
+        varsayilan = self.hazir_combo.findData("yolo11n.pt")
+        self.hazir_combo.setCurrentIndex(varsayilan if varsayilan >= 0 else 0)
+        self.hazir_combo.setToolTip(
+            "ultralytics'in indirebildiği bütün ağırlıklar listede. Kurulu\n"
+            "değilse ilk eğitimde kendiliğinden iner. Listede olmayan bir ad\n"
+            "ya da dosya yolu da yazabilirsin.\n\n"
+            "Parantezli olanlar tespit dışı görevler içindir (poz, segmentasyon,\n"
+            "sınıflandırma); Boxify'ın veri biçimi tespit kutusudur.")
         v1.addLayout(self._row("Hazır ağırlık", self.hazir_combo))
 
         self.kendi_chk = QCheckBox("Kendi modelimden devam et (.pt)")
@@ -1128,6 +1189,25 @@ class MainWindow(QMainWindow):
         self.model_edit.setEnabled(on)
         self.hazir_combo.setEnabled(not on)
 
+    def _secili_hazir_agirlik(self) -> str:
+        """Combo'da seçilen ya da elle yazılan ağırlık adı.
+
+        Liste öğeleri "yolo11n-pose.pt   (poz)" gibi açıklamalı gösteriliyor;
+        gerçek ad öğe verisinde duruyor. Elle yazıldıysa metin olduğu gibi
+        kullanılır, uzantısı yoksa .pt eklenir.
+        """
+        idx = self.hazir_combo.currentIndex()
+        if idx >= 0 and self.hazir_combo.itemText(idx) == self.hazir_combo.currentText():
+            veri = self.hazir_combo.itemData(idx)
+            if veri:
+                return veri
+        metin = self.hazir_combo.currentText().strip()
+        # Kullanıcı açıklamalı hâli kopyalamış olabilir
+        metin = metin.split("   (")[0].strip()
+        if metin and not os.path.splitext(metin)[1]:
+            metin += ".pt"
+        return metin
+
     def _pick_model(self):
         p, _ = QFileDialog.getOpenFileName(
             self, "Başlangıç ağırlığı seç", os.path.dirname(self._baslangic) or "",
@@ -1249,7 +1329,7 @@ class MainWindow(QMainWindow):
 
     def _egitimi_baslat(self):
         baslangic = (self._baslangic if self.kendi_chk.isChecked()
-                     else self.hazir_combo.currentText() + ".pt")
+                     else self._secili_hazir_agirlik())
         ad = time.strftime("egitim_%Y%m%d_%H%M")
         cfg = {
             "data": self._data_yaml,
