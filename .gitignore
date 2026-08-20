@@ -29,3 +29,6 @@ oto_tag-main.zip
 # MLflow yerel deney deposu
 mlflow/
 mlruns/
+
+# ultralytics veri seti indirmeleri (coco8, coco128…) — depoya girmez
+datasets/

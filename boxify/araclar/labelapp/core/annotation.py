@@ -34,9 +34,36 @@ class ImageAnnotation:
     img_width: int = 0
     img_height: int = 0
     bboxes: List[BBox] = field(default_factory=list)
+    # Etiketin okunduğu dosya; kaydederken aynı yere yazılsın diye tutulur
+    _yuklenen_yol: Optional[str] = None
+
+    def ayna_yolu(self):
+        """YOLO'nun standart aynalama düzenindeki etiket yolu.
+
+            .../images/train2017/kare.jpg  ->  .../labels/train2017/kare.txt
+
+        İndirilen her YOLO veri seti (ultralytics, Roboflow dışa aktarımı…)
+        bu düzende gelir: `images` ve `labels` kardeş klasörlerdir ve altlarındaki
+        bölüm adları birebir aynadır. Yol üzerinde `images` geçmiyorsa None.
+        """
+        parcalar = os.path.normpath(self.image_path).split(os.sep)
+        for i in range(len(parcalar) - 2, -1, -1):   # dosya adının kendisi hariç
+            if parcalar[i].lower() == 'images':
+                yeni = parcalar[:i] + ['labels'] + parcalar[i + 1:]
+                return os.path.splitext(os.sep.join(yeni))[0] + '.txt'
+        return None
 
     def label_path(self) -> str:
-        """Birincil kayıt yolu: root_folder/labels/... """
+        """Yeni etiketin yazılacağı yol.
+
+        Aynalama düzenindeki bir veri setinde (indirilen setlerin hepsi öyle)
+        etiket, setin kendi `labels/` ağacına yazılır. Aksi hâlde okuduğu yerden
+        başka bir yere yazmış olurduk: aynı görselin iki etiket dosyası olur ve
+        eğitim eskisini okumaya devam ederdi.
+        """
+        ayna = self.ayna_yolu()
+        if ayna and os.path.isdir(os.path.dirname(ayna)):
+            return ayna
         if self.root_folder:
             rel     = os.path.relpath(self.image_path, self.root_folder)
             rel_txt = os.path.splitext(rel)[0] + '.txt'
@@ -70,7 +97,12 @@ class ImageAnnotation:
         parent = os.path.dirname(img_dir)
         paths.append(os.path.join(parent, 'labels', name_txt))
 
-        # 5. root_folder'ın üstündeki labels/
+        # 5. YOLO aynalama düzeni: .../images/<bölüm>/ ↔ .../labels/<bölüm>/
+        ayna = self.ayna_yolu()
+        if ayna:
+            paths.append(ayna)
+
+        # 6. root_folder'ın üstündeki labels/
         if self.root_folder:
             rel     = os.path.relpath(self.image_path, self.root_folder)
             rel_txt = os.path.splitext(rel)[0] + '.txt'
@@ -97,7 +129,10 @@ class ImageAnnotation:
         return None
 
     def save(self):
-        path = self.label_path()
+        # Etiket okunduysa onun üstüne yaz. Yoksa aynı görselin iki etiket
+        # dosyası olur ve hangisinin geçerli olduğu dosya adına değil, arama
+        # sırasına kalırdı.
+        path = self._yuklenen_yol or self.label_path()
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, 'w') as f:
             for b in self.bboxes:
@@ -107,6 +142,7 @@ class ImageAnnotation:
     def load(self):
         self.bboxes = []
         path = self._find_label_file()
+        self._yuklenen_yol = path
         if path is None:
             return
         with open(path) as f:

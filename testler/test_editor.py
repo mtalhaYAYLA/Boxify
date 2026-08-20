@@ -208,6 +208,75 @@ def kucuk_resim_testi(r, app):
         shutil.rmtree(kok, ignore_errors=True)
 
 
+def indirilen_set_duzeni_testi(r, app):
+    """İndirilen YOLO veri setleri açılabiliyor mu?
+
+    ultralytics, Roboflow ve neredeyse bütün hazır setler görselleri
+    `<kök>/images/<bölüm>/` altında, etiketleri aynalanmış `<kök>/labels/<bölüm>/`
+    altında verir. Bu düzen aday yollar arasında yoktu: 128 görsellik bir set
+    açılıyor ama tek etiket görünmüyordu.
+    """
+    from boxify.araclar.labelapp.core.dataset import Dataset
+    from PyQt5.QtGui import QPixmap
+
+    kok = tempfile.mkdtemp(prefix="boxify_indirilen_")
+    try:
+        img_dir = os.path.join(kok, "images", "train2017")
+        lbl_dir = os.path.join(kok, "labels", "train2017")
+        os.makedirs(img_dir)
+        os.makedirs(lbl_dir)
+        for i in range(3):
+            cv2.imwrite(os.path.join(img_dir, f"k{i}.jpg"),
+                        np.random.default_rng(i).integers(
+                            0, 255, (240, 320, 3), dtype=np.uint8))
+            with open(os.path.join(lbl_dir, f"k{i}.txt"), "w") as f:
+                f.write("2 0.5 0.5 0.2 0.2\n1 0.3 0.3 0.1 0.1\n")
+
+        d = Dataset()
+        d.load_folder(img_dir)
+        d.load_classes()
+        if not d.label_classes:
+            d.auto_detect_classes()
+        ann = d.images[0]
+        pix = QPixmap(ann.image_path)
+        ann.img_width, ann.img_height = pix.width(), pix.height()
+        ann.load()
+
+        r.kontrol(len(d.images) == 3, "aynalanmış düzende görseller bulunuyor")
+        r.kontrol(len(ann.bboxes) == 2,
+                  "aynalanmış labels/ klasöründeki etiketler okunuyor",
+                  f"{len(ann.bboxes)} kutu")
+        r.kontrol(sum(1 for a in d.images if a.is_labeled) == 3,
+                  "hepsi etiketli sayılıyor")
+        r.kontrol(len(d.label_classes) == 3,
+                  "sınıf dosyası yokken etiketlerden sınıf türetiliyor",
+                  f"{len(d.label_classes)} sınıf")
+
+        # kaydetme okunan dosyanın üstüne yazmalı — ikinci bir kopya doğmamalı
+        ann.bboxes.pop()
+        ann.save()
+        r.kontrol(os.path.exists(os.path.join(lbl_dir, "k0.txt")),
+                  "kayıt aynalanmış konuma yazıyor")
+        r.kontrol(not os.path.exists(os.path.join(img_dir, "labels", "k0.txt")),
+                  "ikinci bir etiket dosyası üretilmiyor")
+        with open(os.path.join(lbl_dir, "k0.txt")) as f:
+            r.kontrol(len(f.read().strip().splitlines()) == 1,
+                      "değişiklik gerçekten diske yazılıyor")
+
+        # kök klasörde classes.txt varsa gerçek adlar okunmalı (iki üst seviye)
+        with open(os.path.join(kok, "classes.txt"), "w") as f:
+            f.write("arac\ninsan\nbaret\n")
+        d2 = Dataset()
+        d2.load_folder(img_dir)
+        d2.load_classes()
+        d2.auto_detect_classes()
+        r.kontrol([c.name for c in d2.label_classes] == ["arac", "insan", "baret"],
+                  "veri seti kökündeki classes.txt bulunuyor",
+                  str([c.name for c in d2.label_classes]))
+    finally:
+        shutil.rmtree(kok, ignore_errors=True)
+
+
 def main() -> int:
     r = Rapor("Labelapp editörü")
     app = QApplication.instance() or QApplication([])
@@ -217,6 +286,7 @@ def main() -> int:
     kisayol_testi(r, app)
     gorsel_silme_testi(r, app)
     kucuk_resim_testi(r, app)
+    indirilen_set_duzeni_testi(r, app)
     return r.bitir()
 
 
