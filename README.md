@@ -491,9 +491,17 @@ Hata Analizi ve Model Karşılaştır'a girer, oradan gelen bilgiyle veri büyü
   ek paket gerektirmez.
 - **MLflow'a da kaydet** (isteğe bağlı) — açıkken parametreler, epoch metrikleri ve ağırlıklar
   çıktı klasörünün altındaki `mlflow/` dizinine yazılır; sunucu gerekmez, incelemek için
-  `mlflow ui --backend-store-uri <çıktı>/mlflow` yeter. Kutu **kapalıyken kayıt da kapatılır**:
-  ultralytics'in MLflow geri çağrımı varsayılan olarak açıktır ve mlflow kurulu bir makinede
-  kimse istemeden kayıt tutmaya başlar.
+  `mlflow ui --backend-store-uri sqlite:///<çıktı>/mlflow/mlflow.db` yeter. Kutu **kapalıyken
+  kayıt da kapatılır**: ultralytics'in MLflow geri çağrımı varsayılan olarak açıktır ve mlflow
+  kurulu bir makinede kimse istemeden kayıt tutmaya başlar.
+
+  Aynı kutu **Model Karşılaştır, Hata Analizi ve Model Export**'ta da var — ölçüm üreten her
+  araçta. Model Karşılaştır her modeli, Model Export her ölçülen dosyayı ayrı tur olarak yazar
+  (MLflow'un kıyas ekranı turları yan yana koyduğu için hepsini tek tura tıkmak o ekranı işe
+  yaramaz yapardı); Hata Analizi tek bir skoru değil kaçırma/uydurma/karışıklık dökümünü kaydeder.
+
+  Depo SQLite'tır (`mlflow/mlflow.db`): dosya tabanlı depo MLflow 3.x'te bakım moduna alındı ve
+  `file:` adresiyle kayıt açmak istisna fırlatıyor.
 
 Eğitim ayrı bir süreçte değil, ayrı bir **iş parçacığında** koşar ve ilerleme stdout ayrıştırarak
 değil ultralytics'in `add_callback`'iyle alınır.

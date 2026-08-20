@@ -156,8 +156,11 @@ def mlflow_testi(r, app):
         isci2._mlflow_kur(isci2.cfg)
         depo = os.path.join(kok, "mlflow")
         r.kontrol(SETTINGS["mlflow"] is True, "açıkken ayar açılıyor")
-        r.kontrol(os.environ.get("MLFLOW_TRACKING_URI") == "file:" + depo,
-                  "yerel dosya deposu kuruluyor (sunucu gerekmiyor)",
+        # SQLite: dosya tabanlı depo MLflow 3.x'te bakım modunda ve kayıt
+        # açmaya çalışınca istisna fırlatıyor.
+        r.kontrol(os.environ.get("MLFLOW_TRACKING_URI", "").startswith("sqlite:///")
+                  and depo in os.environ.get("MLFLOW_TRACKING_URI", ""),
+                  "yerel SQLite deposu kuruluyor (sunucu gerekmiyor)",
                   os.environ.get("MLFLOW_TRACKING_URI", "—"))
         r.kontrol(os.path.isdir(depo), "depo klasörü oluşturuluyor")
         r.kontrol(os.environ.get("MLFLOW_RUN") == "t2", "tur adı aktarılıyor")
@@ -296,6 +299,68 @@ def model_secici_testi(r, app):
     dlg.close()
 
 
+def mlflow_yayilim_testi(r, app):
+    """Ölçüm üreten dört aracın hepsinde kayıt var mı, ve gerçekten yazıyor mu?"""
+    from boxify.araclar.mlflow_kayit import (kaydet, mlflow_var, depo_yolu,
+                                             izleme_adresi, onay_kutusu)
+
+    # 1) Kutu her araçta olmalı
+    import importlib
+    eksik = []
+    for modul in ("model_karsilastir", "hata_analizi", "model_export", "egitim"):
+        m = importlib.import_module(f"boxify.araclar.{modul}")
+        w = m.MainWindow()
+        if getattr(w, "mlflow_chk", None) is None:
+            eksik.append(modul)
+        w.close()
+    r.kontrol(not eksik, "ölçüm üreten dört araçta da MLflow kutusu var",
+              "eksik: " + ", ".join(eksik) if eksik else "hepsi tamam")
+
+    kutu = onay_kutusu()
+    r.kontrol(kutu.isEnabled() == mlflow_var(),
+              "mlflow yoksa kutu kapalı, varsa açık",
+              f"mlflow kurulu: {mlflow_var()}")
+    r.kontrol(not kutu.isChecked(),
+              "kutu varsayılan kapalı — sessiz kayıt yok")
+
+    # 2) Depo adresi SQLite olmalı (dosya deposu MLflow 3.x'te bakım modunda)
+    kok = tempfile.mkdtemp(prefix="boxify_mlf2_")
+    try:
+        r.kontrol(izleme_adresi(kok).startswith("sqlite:///"),
+                  "depo SQLite (file: deposu 3.x'te istisna fırlatıyor)",
+                  izleme_adresi(kok))
+
+        # 3) Gerçekten yazıp geri okunabiliyor mu
+        notu = kaydet(kok, "boxify-test", "tur_1",
+                      parametreler={"model": "yolo11n.pt"},
+                      metrikler={"fps": 31.5, "tp": 12, "sinif/person": 4},
+                      etiketler={"arac": "test"})
+        if not mlflow_var():
+            r.kontrol(notu == "", "mlflow yokken sessizce atlanıyor")
+            r.bilgi("mlflow kurulu değil — yazma turu atlandı")
+            return
+        r.kontrol("kaydedildi" in notu, "kayıt başarılı", notu[:70])
+        r.kontrol(os.path.exists(os.path.join(depo_yolu(kok), "mlflow.db")),
+                  "SQLite deposu oluşuyor")
+
+        import mlflow
+        mlflow.set_tracking_uri(izleme_adresi(kok))
+        turlar = mlflow.search_runs(experiment_names=["boxify-test"])
+        r.kontrol(len(turlar) == 1, "yazılan tur geri okunuyor", f"{len(turlar)} tur")
+        r.kontrol(abs(float(turlar["metrics.fps"][0]) - 31.5) < 1e-6,
+                  "metrikler doğru kaydediliyor")
+        r.kontrol("metrics.sinif/person" in turlar.columns,
+                  "sınıf bazlı metrikler de yazılıyor")
+
+        # 4) Hata hâlinde araç düşmemeli
+        notu2 = kaydet("/erisilemeyen/\x00/yol", "boxify-test", "t2",
+                       metrikler={"x": 1})
+        r.kontrol(isinstance(notu2, str),
+                  "yazılamadığında istisna değil, açıklama dönüyor", notu2[:60])
+    finally:
+        shutil.rmtree(kok, ignore_errors=True)
+
+
 def main() -> int:
     r = Rapor("Geçmiş, MLflow ve sıfır-atış")
     app = QApplication.instance() or QApplication([])
@@ -306,6 +371,7 @@ def main() -> int:
     sifir_atis_testi(r, app)
     acik_sozluk_yukleyici_testi(r, app)
     model_secici_testi(r, app)
+    mlflow_yayilim_testi(r, app)
     return r.bitir()
 
 

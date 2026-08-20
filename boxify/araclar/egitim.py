@@ -40,12 +40,9 @@ from ..dil import tr
 from ..klasor_ac import klasoru_ac
 from .model_bilgi import cihaz_combo_doldur
 from .model_secici import ModelSecici
+from .mlflow_kayit import mlflow_var
 
 
-def mlflow_var() -> bool:
-    """MLflow kurulu mu? (import edilmeden, yalnızca bulunabilirliğe bakılır)"""
-    import importlib.util
-    return importlib.util.find_spec("mlflow") is not None
 
 # ─────────────────────────────────────────────── sızıntı denetimi
 
@@ -206,19 +203,22 @@ class EgitimIscisi(QThread):
                 pass
             return
 
-        depo = os.path.join(cfg["proje"], "mlflow")
+        from .mlflow_kayit import depo_yolu, izleme_adresi, kayit_ipucu
+        depo = depo_yolu(cfg["proje"])
         os.makedirs(depo, exist_ok=True)
-        # Yerel dosya deposu: sunucu çalıştırmak gerekmiyor, klasör projeyle
-        # birlikte taşınıyor.
-        os.environ["MLFLOW_TRACKING_URI"] = "file:" + depo
-        os.environ["MLFLOW_EXPERIMENT_NAME"] = "boxify"
+        # SQLite depo: sunucu gerekmiyor ve klasör projeyle taşınıyor. Dosya
+        # tabanlı depo ("file:…") MLflow 3.x'te bakım moduna alındı, kayıt
+        # açmaya çalışınca istisna fırlatıyor — yani eski hâli o sürümlerde
+        # sessizce değil, gürültülü biçimde çalışmıyordu.
+        os.environ["MLFLOW_TRACKING_URI"] = izleme_adresi(cfg["proje"])
+        os.environ["MLFLOW_EXPERIMENT_NAME"] = "boxify-egitim"
         os.environ["MLFLOW_RUN"] = cfg["ad"]
         try:
             SETTINGS["mlflow"] = True
         except Exception:
             pass
         self.log.emit(f"MLflow kaydı açık → {depo}")
-        self.log.emit("İncelemek için:  mlflow ui --backend-store-uri " + depo)
+        self.log.emit("İncelemek için:  " + kayit_ipucu(cfg["proje"]))
 
     def run(self):
         cfg = self.cfg

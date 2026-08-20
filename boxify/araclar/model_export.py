@@ -24,6 +24,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 
 from ..tema import STYLE  # ortak açık tema — bkz. boxify/tema.py
+from .mlflow_kayit import onay_kutusu, kaydet as mlflow_kaydet
 from .model_bilgi import cihaz_combo_doldur
 
 IMG_EXTS = (".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff")
@@ -560,6 +561,9 @@ class MainWindow(QMainWindow):
         self.compare_n_spin.setFixedWidth(90)
         v.addLayout(self._row("Sapma için kare", self.compare_n_spin))
 
+        self.mlflow_chk = onay_kutusu()
+        v.addWidget(self.mlflow_chk)
+
         self.bench_btn = QPushButton("⏱  Hızı Ölç")
         self.bench_btn.setMinimumHeight(36)
         self.bench_btn.setStyleSheet(
@@ -745,12 +749,37 @@ class MainWindow(QMainWindow):
         self.progress.setValue(done)
         self.status.showMessage(f"{done}/{total}")
 
+    def _mlflowa_yaz(self, rows: list):
+        """Her ölçülen dosyayı ayrı tur olarak kaydet.
+
+        Hız ölçümü donanıma bağlı olduğu için asıl değeri kıyasta: aynı modelin
+        ONNX'i mi TensorRT'si mi hızlı, ve dönüşüm sapması ne kadar. Tek tura
+        tıkmak o kıyası imkânsız yapardı.
+        """
+        if not (self.mlflow_chk.isChecked() and self.mlflow_chk.isEnabled()):
+            return
+        import time as _t
+        damga = _t.strftime("%Y%m%d_%H%M%S")
+        for satir in rows:
+            ad = os.path.basename(str(satir.get("model", "model")))
+            metrikler = {k: v for k, v in satir.items()
+                         if isinstance(v, (int, float)) and v is not None}
+            notu = mlflow_kaydet(
+                os.path.dirname(str(satir.get("model", ""))) or os.getcwd(),
+                "boxify-model-export", f"{damga}_{ad}",
+                parametreler={"dosya": ad, "boyut": satir.get("boyut", "")},
+                metrikler=metrikler,
+                etiketler={"arac": "model_export"})
+            if notu:
+                self._log(notu)
+
     def _on_bench_result(self, res: dict):
         rows = res.get("rows", [])
         if not rows:
             self.status.showMessage("Ölçüm sonucu yok (loga bak).")
             return
         self.report_box.setPlainText(self._bench_report(rows))
+        self._mlflowa_yaz(rows)
         self.tabs_out.setCurrentIndex(0)
         self.status.showMessage("Ölçüm bitti." + (" (iptal)" if res.get("iptal") else ""))
 

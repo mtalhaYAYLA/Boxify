@@ -1106,6 +1106,16 @@ SOZLUK = {
     "En iyi mAP50-95": "Best mAP50-95",
     "Başlangıç": "Start weight",
     "MLflow'a da kaydet": "Also log to MLflow",
+    "Ölçüm sonuçları çıktı klasörünün altındaki mlflow/ dizinine\n"
+    "yazılır. Sunucu gerekmez; incelemek için:\n"
+    "  mlflow ui --backend-store-uri sqlite:///<çıktı>/mlflow/mlflow.db":
+        "Measurements are written to the mlflow/ folder under the output\n"
+        "directory. No server needed; to inspect:\n"
+        "  mlflow ui --backend-store-uri sqlite:///<output>/mlflow/mlflow.db",
+    "MLflow kurulu değil. Kurmak için:  pip install mlflow\n"
+    "Kurulu olmaması hiçbir aracı engellemez.":
+        "MLflow is not installed. To install:  pip install mlflow\n"
+        "No tool is blocked without it.",
     "Çıktı klasöründeki turlar. Kıyaslamak için birden fazla satır seç.":
         "Runs in the output folder. Select more than one row to compare.",
     "Kıyaslamak için listeden bir ya da birkaç tur seç":

@@ -24,6 +24,7 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal, QRectF, QLineF
 from PyQt5.QtGui import QImage, QPainter, QPen, QColor, QFont
 
 from ..tema import STYLE, renk  # ortak açık tema — bkz. boxify/tema.py
+from .mlflow_kayit import onay_kutusu, kaydet as mlflow_kaydet
 from .model_bilgi import SinifYukleyici, sinif_ozeti, cihaz_combo_doldur
 
 IMG_EXTS = (".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff")
@@ -665,6 +666,9 @@ class MainWindow(QMainWindow):
                                  "gereken örtüşme")
         v.addLayout(self._row("Eşleştirme IoU", self.eval_iou))
 
+        self.mlflow_chk = onay_kutusu()
+        v.addWidget(self.mlflow_chk)
+
         self.eval_btn = QPushButton("🔍  Değerlendir")
         self.eval_btn.setMinimumHeight(36)
         self.eval_btn.setStyleSheet(
@@ -921,6 +925,39 @@ class MainWindow(QMainWindow):
         self.active_btn.setEnabled(True)
         self.cancel_btn.setEnabled(False)
 
+    def _mlflowa_yaz(self, res: dict):
+        """Değerlendirme dökümünü kaydet.
+
+        Kaydedilen şey tek bir skor değil, hata dökümünün kendisi: kaçırma
+        (fn), uydurma (fp) ve sınıf karışıklığı (conf). Turlar arası asıl
+        kıyas bunlar üzerinden yapılıyor — "mAP arttı" tek başına hangi
+        hatanın azaldığını söylemiyor.
+        """
+        if not (self.mlflow_chk.isChecked() and self.mlflow_chk.isEnabled()):
+            return
+        if res.get("mode") != "eval":
+            return
+        import time as _t
+        toplam = res.get("toplam") or {}
+        metrikler = {k: v for k, v in toplam.items() if isinstance(v, (int, float))}
+        tp, fp, fn = toplam.get("tp", 0), toplam.get("fp", 0), toplam.get("fn", 0)
+        if tp + fp:
+            metrikler["kesinlik"] = tp / (tp + fp)
+        if tp + fn:
+            metrikler["duyarlilik"] = tp / (tp + fn)
+        metrikler["gorsel"] = len(res.get("items") or [])
+        notu = mlflow_kaydet(
+            os.path.dirname(self._model_path) or os.getcwd(),
+            "boxify-hata-analizi",
+            _t.strftime("%Y%m%d_%H%M%S"),
+            parametreler={"model": os.path.basename(self._model_path),
+                          "conf": self.eval_conf.value(),
+                          "iou": self.eval_iou.value()},
+            metrikler=metrikler,
+            etiketler={"arac": "hata_analizi"})
+        if notu:
+            self._log(notu)
+
     def _on_result(self, res: dict):
         self._mode = res["mode"]
         self._items = res["items"]
@@ -933,6 +970,7 @@ class MainWindow(QMainWindow):
             self.report_box.setPlainText(self._active_report(res))
         self.tabs_out.setCurrentIndex(0)
         self.status.showMessage("Bitti." + (" (iptal edildi)" if res["iptal"] else ""))
+        self._mlflowa_yaz(res)
 
     # ── liste / önizleme
     def _refill(self):

@@ -38,6 +38,7 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize
 from PyQt5.QtGui import QImage, QPixmap
 
 from ..tema import STYLE, MAVI  # ortak açık tema — bkz. boxify/tema.py
+from .mlflow_kayit import onay_kutusu, kaydet as mlflow_kaydet
 from .model_bilgi import SinifYukleyici, sinif_ozeti, cihaz_combo_doldur
 
 MAX_MODELS = 3
@@ -568,6 +569,8 @@ class MainWindow(QMainWindow):
         self.out_edit = QLineEdit()
         self.out_edit.setPlaceholderText("karşılaştırma videosunun kaydedileceği klasör")
         sv.addLayout(self._dir_row(self.out_edit, self._pick_out_dir))
+        self.mlflow_chk = onay_kutusu()
+        sv.addWidget(self.mlflow_chk)
 
         # Çıktıyla ilgili iki kısayol da burada: iş bitince "Sonucu Aç"ı
         # kaydırıp aramak zorunda kalmamak için şeritte duruyorlar
@@ -1353,6 +1356,29 @@ class MainWindow(QMainWindow):
         self._log("HATA: " + msg)
         QMessageBox.critical(self, "Hata", msg)
 
+    def _mlflowa_yaz(self, summary: dict, cfg: dict):
+        """Her modelin sayılarını ayrı bir tur olarak kaydet.
+
+        Model başına ayrı tur, çünkü MLflow'un kıyas ekranı turları yan yana
+        koyar; hepsini tek tura tıkarsak o ekran işe yaramaz hâle gelir.
+        """
+        if not (self.mlflow_chk.isChecked() and self.mlflow_chk.isEnabled()):
+            return
+        import time as _t
+        damga = _t.strftime("%Y%m%d_%H%M%S")
+        for etiket, st in summary.items():
+            metrikler = {k: v for k, v in st.items() if isinstance(v, (int, float))}
+            for sinif_ad, adet in (st.get("sinif") or {}).items():
+                metrikler[f"sinif/{sinif_ad}"] = adet
+            notu = mlflow_kaydet(
+                self._out_dir, "boxify-model-karsilastir", f"{damga}_{etiket}",
+                parametreler={"model": etiket, **{k: v for k, v in cfg.items()
+                                                  if not isinstance(v, (dict, list))}},
+                metrikler=metrikler,
+                etiketler={"arac": "model_karsilastir"})
+            if notu:
+                self._log(notu)
+
     def _build_report(self, summary: dict, cfg: dict) -> str:
         L = ["═══ MODEL KARŞILAŞTIRMA RAPORU ═══",
              f"Video: {os.path.basename(cfg['video_path'])}   ({cfg['range_text']})",
@@ -1439,6 +1465,7 @@ class MainWindow(QMainWindow):
     def _on_summary(self, summary: dict, cfg: dict):
         self.report_box.setPlainText(self._build_report(summary, cfg))
         self.tabs.setCurrentIndex(1)
+        self._mlflowa_yaz(summary, cfg)
 
         # Tek bir kare bile üretemeyen model, "0 tespit" satırıyla sanki bir
         # sonuç vermiş gibi görünür; sebebi (yanlış cihaz, bozuk ağırlık…)
