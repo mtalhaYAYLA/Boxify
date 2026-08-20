@@ -485,6 +485,7 @@ class MainWindow(QMainWindow):
                            if "-pf" in ad else "")
             self.zs_model_combo.addItem(etiket, ad)
         self.zs_model_combo.addItem("Yukarıdaki model kutusundaki dosyayı kullan", "")
+        self.zs_model_combo.setMaxVisibleItems(20)
         self.zs_model_combo.setEnabled(False)
         self.zs_model_combo.setToolTip(
             "Metinle tespit edebilen ağırlıklar (YOLO-World / YOLOE).\n"

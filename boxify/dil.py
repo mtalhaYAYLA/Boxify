@@ -1042,6 +1042,24 @@ SOZLUK = {
     "aranacak nesneler, virgülle: forklift, baret, palet":
         "objects to find, comma separated: forklift, helmet, pallet",
     "Ağırlık": "Weights",
+    "%d ağırlık listede — süzmek için yaz (ör. yolo26); listede "
+    "olmayan bir ad ya da yol da yazılabilir.":
+        "%d weights listed — type to filter (e.g. yolo26); you can also enter "
+        "a name or path that is not in the list.",
+    "Metinle tespit edebilen ağırlıklar (YOLO-World / YOLOE).\n"
+    "Listede olmayan bir ad ya da dosya yolu da yazabilirsin.":
+        "Weights that can detect from text (YOLO-World / YOLOE).\n"
+        "You can also type a name or file path that is not in the list.",
+    "ultralytics'in indirebildiği bütün ağırlıklar listede. Kurulu\n"
+    "değilse ilk eğitimde kendiliğinden iner. Listede olmayan bir ad\n"
+    "ya da dosya yolu da yazabilirsin.\n\n"
+    "Parantezli olanlar tespit dışı görevler içindir (poz, segmentasyon,\n"
+    "sınıflandırma); Boxify'ın veri biçimi tespit kutusudur.":
+        "Every weight ultralytics can download is in the list. If it is not\n"
+        "installed it is fetched on the first training run. You can also type\n"
+        "a name or file path that is not in the list.\n\n"
+        "The ones in parentheses are for non-detection tasks (pose, segmentation,\n"
+        "classification); Boxify's data format is detection boxes.",
     "Eğitilmiş modelin yokken kullan. Sonuç taslaktır: düşük eşikle "
     "çalıştırıp Labelapp'te gözden geçirmek en hızlı yol.\n"
     "İlk kullanımda internet gerekir: ağırlık ve metin gömme modeli "

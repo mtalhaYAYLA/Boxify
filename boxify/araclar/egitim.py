@@ -36,6 +36,7 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize
 from PyQt5.QtGui import QPainter, QColor, QPen, QFont
 
 from ..tema import STYLE, renk, koyu_mu
+from ..dil import tr
 from ..klasor_ac import klasoru_ac
 from .model_bilgi import cihaz_combo_doldur
 
@@ -54,9 +55,70 @@ def mlflow_var() -> bool:
 # listede olmayan bir ad ya da yol da yazılabilir.
 #
 # ultralytics kurulu değilse (arayüz onsuz da açılıyor) bu yedek liste kullanılır.
+# Kısa tutmak kısıtın kendisini geri getiriyordu: PyQt5'i olup ultralytics'i
+# olmayan bir yorumlayıcıda açılan Boxify, kullanıcıya on model gösteriyordu.
+# Bu yüzden liste ultralytics'in kendi listesinin tam kopyası (SAM ailesi hariç).
 YEDEK_MODELLER = [
-    "yolo11n.pt", "yolo11s.pt", "yolo11m.pt", "yolo11l.pt", "yolo11x.pt",
-    "yolov8n.pt", "yolov8s.pt", "yolov8m.pt", "yolov8l.pt", "yolov8x.pt",
+    # rtdetr (2)
+    "rtdetr-l.pt", "rtdetr-x.pt",
+    # yolo11 (26)
+    "yolo11l-cls.pt", "yolo11l-obb.pt", "yolo11l-pose.pt", "yolo11l-seg.pt",
+    "yolo11l.pt", "yolo11m-cls.pt", "yolo11m-obb.pt", "yolo11m-pose.pt",
+    "yolo11m-seg.pt", "yolo11m.pt", "yolo11n-cls.pt", "yolo11n-grayscale.pt",
+    "yolo11n-obb.pt", "yolo11n-pose.pt", "yolo11n-seg.pt", "yolo11n.pt",
+    "yolo11s-cls.pt", "yolo11s-obb.pt", "yolo11s-pose.pt", "yolo11s-seg.pt",
+    "yolo11s.pt", "yolo11x-cls.pt", "yolo11x-obb.pt", "yolo11x-pose.pt",
+    "yolo11x-seg.pt", "yolo11x.pt",
+    # yolo12 (5)
+    "yolo12l.pt", "yolo12m.pt", "yolo12n.pt", "yolo12s.pt", "yolo12x.pt",
+    # yolo26 (45)
+    "yolo26l-cls.pt", "yolo26l-depth.pt", "yolo26l-obb.pt",
+    "yolo26l-objv1-150.pt", "yolo26l-objv1-seg.pt", "yolo26l-pose.pt",
+    "yolo26l-seg.pt", "yolo26l-sem.pt", "yolo26l.pt", "yolo26m-cls.pt",
+    "yolo26m-depth.pt", "yolo26m-obb.pt", "yolo26m-objv1-150.pt",
+    "yolo26m-objv1-seg.pt", "yolo26m-pose.pt", "yolo26m-seg.pt",
+    "yolo26m-sem.pt", "yolo26m.pt", "yolo26n-cls.pt", "yolo26n-depth.pt",
+    "yolo26n-obb.pt", "yolo26n-objv1-150.pt", "yolo26n-objv1-seg.pt",
+    "yolo26n-pose.pt", "yolo26n-seg.pt", "yolo26n-sem.pt", "yolo26n.pt",
+    "yolo26s-cls.pt", "yolo26s-depth.pt", "yolo26s-obb.pt",
+    "yolo26s-objv1-150.pt", "yolo26s-objv1-seg.pt", "yolo26s-pose.pt",
+    "yolo26s-seg.pt", "yolo26s-sem.pt", "yolo26s.pt", "yolo26x-cls.pt",
+    "yolo26x-depth.pt", "yolo26x-obb.pt", "yolo26x-objv1-150.pt",
+    "yolo26x-objv1-seg.pt", "yolo26x-pose.pt", "yolo26x-seg.pt",
+    "yolo26x-sem.pt", "yolo26x.pt",
+    # yolo_nas (3)
+    "yolo_nas_l.pt", "yolo_nas_m.pt", "yolo_nas_s.pt",
+    # yoloe (22)
+    "yoloe-11l-seg-pf.pt", "yoloe-11l-seg.pt", "yoloe-11m-seg-pf.pt",
+    "yoloe-11m-seg.pt", "yoloe-11s-seg-pf.pt", "yoloe-11s-seg.pt",
+    "yoloe-26l-seg-pf.pt", "yoloe-26l-seg.pt", "yoloe-26m-seg-pf.pt",
+    "yoloe-26m-seg.pt", "yoloe-26n-seg-pf.pt", "yoloe-26n-seg.pt",
+    "yoloe-26s-seg-pf.pt", "yoloe-26s-seg.pt", "yoloe-26x-seg-pf.pt",
+    "yoloe-26x-seg.pt", "yoloe-v8l-seg-pf.pt", "yoloe-v8l-seg.pt",
+    "yoloe-v8m-seg-pf.pt", "yoloe-v8m-seg.pt", "yoloe-v8s-seg-pf.pt",
+    "yoloe-v8s-seg.pt",
+    # yolov10 (6)
+    "yolov10b.pt", "yolov10l.pt", "yolov10m.pt", "yolov10n.pt", "yolov10s.pt",
+    "yolov10x.pt",
+    # yolov3 (3)
+    "yolov3-sppu.pt", "yolov3-tinyu.pt", "yolov3u.pt",
+    # yolov5 (10)
+    "yolov5l6u.pt", "yolov5lu.pt", "yolov5m6u.pt", "yolov5mu.pt",
+    "yolov5n6u.pt", "yolov5nu.pt", "yolov5s6u.pt", "yolov5su.pt",
+    "yolov5x6u.pt", "yolov5xu.pt",
+    # yolov8 (38)
+    "yolov8l-cls.pt", "yolov8l-obb.pt", "yolov8l-oiv7.pt", "yolov8l-pose.pt",
+    "yolov8l-seg.pt", "yolov8l-world.pt", "yolov8l-worldv2.pt", "yolov8l.pt",
+    "yolov8m-cls.pt", "yolov8m-obb.pt", "yolov8m-oiv7.pt", "yolov8m-pose.pt",
+    "yolov8m-seg.pt", "yolov8m-world.pt", "yolov8m-worldv2.pt", "yolov8m.pt",
+    "yolov8n-cls.pt", "yolov8n-obb.pt", "yolov8n-oiv7.pt", "yolov8n-pose.pt",
+    "yolov8n-seg.pt", "yolov8n.pt", "yolov8s-cls.pt", "yolov8s-obb.pt",
+    "yolov8s-oiv7.pt", "yolov8s-pose.pt", "yolov8s-seg.pt",
+    "yolov8s-world.pt", "yolov8s-worldv2.pt", "yolov8s.pt", "yolov8x-cls.pt",
+    "yolov8x-obb.pt", "yolov8x-oiv7.pt", "yolov8x-pose.pt", "yolov8x-seg.pt",
+    "yolov8x-world.pt", "yolov8x-worldv2.pt", "yolov8x.pt",
+    # yolov9 (5)
+    "yolov9c.pt", "yolov9e.pt", "yolov9m.pt", "yolov9s.pt", "yolov9t.pt",
 ]
 
 # Tespit dışı görevler (sınıflandırma, poz, segmentasyon, yönlü kutu). Boxify'ın
@@ -753,6 +815,9 @@ class MainWindow(QMainWindow):
         if tamamlayici is not None:
             tamamlayici.setCaseSensitivity(Qt.CaseInsensitive)
             tamamlayici.setFilterMode(Qt.MatchContains)
+        # Qt varsayılanı tek seferde 10 satır gösteriyor; 165 ağırlıklı bir
+        # listede bu, "sadece 10 model var" gibi okunuyordu.
+        self.hazir_combo.setMaxVisibleItems(24)
         varsayilan = self.hazir_combo.findData("yolo11n.pt")
         self.hazir_combo.setCurrentIndex(varsayilan if varsayilan >= 0 else 0)
         self.hazir_combo.setToolTip(
@@ -762,6 +827,17 @@ class MainWindow(QMainWindow):
             "Parantezli olanlar tespit dışı görevler içindir (poz, segmentasyon,\n"
             "sınıflandırma); Boxify'ın veri biçimi tespit kutusudur.")
         v1.addLayout(self._row("Hazır ağırlık", self.hazir_combo))
+
+        self.model_sayi_lbl = QLabel()
+        self.model_sayi_lbl.setStyleSheet("color:#6b7686; font-size:11px;")
+        # Şablon önce çevriliyor, sayı sonra yerleştiriliyor: sayı gömülü bir
+        # metin sözlükteki hiçbir anahtarla eşleşmezdi.
+        self.model_sayi_lbl.setText(
+            tr("%d ağırlık listede — süzmek için yaz (ör. yolo26); listede "
+               "olmayan bir ad ya da yol da yazılabilir.")
+            % self.hazir_combo.count())
+        self.model_sayi_lbl.setWordWrap(True)
+        v1.addWidget(self.model_sayi_lbl)
 
         self.kendi_chk = QCheckBox("Kendi modelimden devam et (.pt)")
         self.kendi_chk.setToolTip(
