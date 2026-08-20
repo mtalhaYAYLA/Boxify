@@ -25,6 +25,7 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal
 
 from ..tema import STYLE  # ortak açık tema — bkz. boxify/tema.py
 from .mlflow_kayit import onay_kutusu, kaydet as mlflow_kaydet
+from . import dayaniklilik as dyn
 from .model_bilgi import cihaz_combo_doldur
 
 IMG_EXTS = (".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff")
@@ -245,18 +246,48 @@ class BenchWorker(QThread):
             pre, inf, post, wall = [], [], [], []
             preds = []
             hata = False
-            for i in range(cfg["iters"]):
+            # Dayanıklılık koşusunda tekrar sayısı değil süre belirleyici olur;
+            # asıl soru "kaç karede ne kadar sürdü" değil, "uzun koşuda ne
+            # değişti". Sağlık örnekleri periyodik alınır.
+            soak_sn = float(cfg.get("soak_dk", 0)) * 60.0
+            saglik = []
+            hata_sayisi, son_hata = 0, ""
+            t_baslangic = time.perf_counter()
+            son_ornek = 0.0
+            i = -1
+            while True:
+                i += 1
                 if self._cancel:
+                    break
+                if soak_sn > 0:
+                    gecen = time.perf_counter() - t_baslangic
+                    if gecen >= soak_sn:
+                        break
+                elif i >= cfg["iters"]:
                     break
                 path = images[i % len(images)]
                 t0 = time.perf_counter()
                 try:
                     res = self._predict(model, path)
                 except Exception as e:
+                    hata_sayisi += 1
+                    son_hata = str(e)
+                    # Dayanıklılık koşusunda tek bir hata koşuyu bitirmemeli:
+                    # ölçülmek istenen şey zaten "arada hata veriyor mu".
+                    if soak_sn > 0:
+                        if hata_sayisi <= 3:
+                            self.log.emit(f"çıkarım hatası ({hata_sayisi}): {e}")
+                        continue
                     self.log.emit(f"HATA: çıkarım başarısız — {e}")
                     hata = True
                     break
                 wall.append((time.perf_counter() - t0) * 1000.0)
+                if soak_sn > 0:
+                    gecen = time.perf_counter() - t_baslangic
+                    if gecen - son_ornek >= dyn.ORNEK_ARALIGI_SN:
+                        son_ornek = gecen
+                        saglik.append(dyn.saglik_ornegi(gecen, wall[-1]))
+                        self.progress.emit(int(gecen), int(soak_sn))
                 sp = getattr(res, "speed", None) or {}
                 pre.append(float(sp.get("preprocess", 0.0)))
                 inf.append(float(sp.get("inference", 0.0)))
@@ -264,7 +295,8 @@ class BenchWorker(QThread):
                 if cfg["compare"] and i < cfg["compare_n"]:
                     preds.append(self._extract(res))
                 step += 1
-                self.progress.emit(step, total_steps)
+                if soak_sn <= 0:
+                    self.progress.emit(step, total_steps)
 
             if hata or not wall:
                 continue
@@ -282,6 +314,17 @@ class BenchWorker(QThread):
                 "n": len(wall),
             }
             row.update(kararlilik(wall))
+            if soak_sn > 0:
+                saglik.append(dyn.saglik_ornegi(time.perf_counter() - t_baslangic,
+                                                wall[-1] if wall else None))
+                row["saglik"] = saglik
+                row["degerlendirme"] = dyn.degerlendir(saglik, hata_sayisi, son_hata)
+                row["soak_dk"] = cfg.get("soak_dk", 0)
+                row["hata_sayisi"] = hata_sayisi
+                row["csv"] = dyn.csv_yaz(
+                    os.path.join(os.path.dirname(mpath), "dayaniklilik",
+                                 f"{os.path.splitext(os.path.basename(mpath))[0]}_saglik.csv"),
+                    saglik)
             if cfg["compare"]:
                 if mi == 0:
                     ref_preds = preds
@@ -611,6 +654,20 @@ class MainWindow(QMainWindow):
         self.compare_n_spin.setFixedWidth(90)
         v.addLayout(self._row("Sapma için kare", self.compare_n_spin))
 
+        self.soak_spin = QSpinBox()
+        self.soak_spin.setRange(0, 720)
+        self.soak_spin.setValue(0)
+        self.soak_spin.setFixedWidth(90)
+        self.soak_spin.setSuffix(" dk")
+        self.soak_spin.setToolTip(
+            "0 = normal hız ölçümü (tekrar sayısı kadar koşar).\n\n"
+            "0'dan büyükse dayanıklılık koşusu: model bu süre boyunca aralıksız\n"
+            "çalışır, bellek/takas/sıcaklık örneklenir ve sonunda bir\n"
+            "GEÇTİ/UYARI/KALDI değerlendirmesi çıkar.\n\n"
+            "Hız ölçümü 'ne kadar hızlı' sorusunu cevaplar; bu, 'uzun koşuda\n"
+            "ayakta mı' sorusunu. Sahaya giden bir sistemde ikincisi belirleyici.")
+        v.addLayout(self._row("Dayanıklılık koşusu", self.soak_spin))
+
         self.mlflow_chk = onay_kutusu()
         v.addWidget(self.mlflow_chk)
 
@@ -782,6 +839,7 @@ class MainWindow(QMainWindow):
             "cpu_threads": int(self.threads_spin.value()),
             "compare": self.compare_chk.isChecked(),
             "compare_n": int(self.compare_n_spin.value()),
+            "soak_dk": int(self.soak_spin.value()),
         }
         self._log(f"── hız ölçümü: {len(models)} model, {cfg['iters']} tekrar, "
                   f"imgsz {cfg['imgsz']} ──")
@@ -895,6 +953,25 @@ class MainWindow(QMainWindow):
         L.append("Not: gerçek sistemde kod çözme (decode), ROI ve I/O da CPU yer; "
                  "bu üst sınırdır.")
         L.append("")
+
+        soaklar = [r for r in rows if r.get("degerlendirme")]
+        if soaklar:
+            L.append("── Dayanıklılık koşusu ──")
+            for r in soaklar:
+                ozet = dyn.ozet_durum(r["degerlendirme"])
+                L.append(f"{os.path.basename(r['model'])}  —  {r['soak_dk']} dk  "
+                         f"→  {ozet}")
+                for eksen, durum, aciklama in r["degerlendirme"]:
+                    isaret = {dyn.GECER: "  ok ", dyn.UYARI: "  !  ",
+                              dyn.KALDI: " !!! "}.get(durum, "     ")
+                    L.append(f"{isaret}{eksen:<22s}{durum:<7s}{aciklama}")
+                L.append(f"      örnek: {len(r.get('saglik') or [])} "
+                         f"({dyn.ORNEK_ARALIGI_SN:g} sn'de bir)"
+                         + (f"   ·   {r['csv']}" if r.get("csv") else ""))
+                L.append("")
+            L.append("KALDI = sahaya çıkmadan önce bakılmalı. UYARI çoğu zaman")
+            L.append("okunamayan bir sensördür; açıklamasını oku.")
+            L.append("")
 
         sapmalar = [r for r in rows if r.get("sapma")]
         if sapmalar:

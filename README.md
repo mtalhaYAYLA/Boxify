@@ -544,6 +544,16 @@ orijinalden ne kadar saptığını) raporlar. Ölçümü hedef donanımda yapmak
 
 ![Model Export](gorseller/model_export.png)
 
+**Dayanıklılık koşusu** — "ne kadar hızlı" ile "uzun koşuda ayakta mı" farklı sorulardır ve
+sahaya giden bir sistemde ikincisi belirleyicidir. Süre alanına 0'dan büyük bir değer verirsen
+model o kadar dakika aralıksız çalışır; bellek, takas ve (okunabiliyorsa) sıcaklık beş saniyede
+bir örneklenir. Sonunda eksen eksen bir **GEÇTİ / UYARI / KALDI** değerlendirmesi çıkar: bellek
+sızıntısı, takas artışı, sıcaklık, hız sürüklenmesi ve arada gelen çıkarım hataları. Örnekler
+ayrıca CSV olarak yazılır.
+
+Bir kural: **okunamayan eksen GEÇTİ değil UYARI sayılır.** macOS ve Windows'ta sıcaklık sensörü
+ek yazılım olmadan okunamaz; ölçemediğini geçmiş saymak raporu olduğundan güvenli gösterirdi.
+
 **Kararlılık ölçümü** — ortalama ve p95, ısınmış ve sabit bir makinede yeterli. Gerçek dağıtım
 donanımında (özellikle Jetson gibi pasif soğutmalı kartlarda) sorun ortalamada değil kuyruğunda
 çıkar. Rapor bu yüzden ayrıca **p99, en kötü kare, standart sapma, sivrilme sayısı** (medyanın iki

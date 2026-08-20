@@ -404,6 +404,86 @@ def kararlilik_testi(r, app):
               "standart sapma dönüşüm sapmasıyla çakışmıyor")
 
 
+def dayaniklilik_olcum_testi(r, app):
+    """Uzun koşu değerlendirmesi: sızıntı, ısınma ve yavaşlama yakalanıyor mu?
+
+    Ölçüt kümesi jetson_test_pack/freeze_diag'dan alındı. Buradaki asıl
+    tasarım kararı şu: okunamayan bir eksen GEÇTİ değil UYARI sayılıyor —
+    ölçemediğini geçmiş saymak raporu olduğundan güvenli gösterir.
+    """
+    from boxify.araclar import dayaniklilik as dyn
+
+    ram, takas = dyn.bellek_ornegi()
+    r.kontrol(ram is not None and ram > 0,
+              "bellek üç işletim sisteminde de okunabiliyor",
+              f"{ram:.0f} MB kullanılabilir" if ram else "okunamadı")
+    r.kontrol(takas is None or takas >= 0, "takas değeri anlamlı",
+              f"{takas:.0f} MB" if takas is not None else "yok")
+    r.kontrol(dyn.sicaklik_c() is None or 0 < dyn.sicaklik_c() < 150,
+              "sıcaklık ya okunuyor ya da None (uydurulmuyor)")
+
+    ornek = dyn.saglik_ornegi(1.0, 12.3)
+    r.kontrol(set(ornek) == {"t_sn", "ram_mb", "takas_mb", "sicaklik_c", "gecikme_ms"},
+              "sağlık örneği beklenen alanları taşıyor")
+
+    def kosu(ram_dusus=0, gecikme_artis=0.0, sicaklik=None, n=12):
+        return [{"t_sn": i * 5, "ram_mb": 4000 - i * ram_dusus, "takas_mb": 10.0,
+                 "sicaklik_c": sicaklik, "gecikme_ms": 10.0 + i * gecikme_artis}
+                for i in range(n)]
+
+    def eksen(sonuc, ad):
+        return next((d for e, d, _a in sonuc if e == ad), None)
+
+    saglikli = dyn.degerlendir(kosu(), 0)
+    r.kontrol(eksen(saglikli, "bellek sızıntısı") == dyn.GECER,
+              "sabit bellekte sızıntı raporlanmıyor")
+    r.kontrol(eksen(saglikli, "hız sürüklenmesi") == dyn.GECER,
+              "sabit hızda sürüklenme raporlanmıyor")
+    r.kontrol(eksen(saglikli, "sıcaklık") == dyn.UYARI,
+              "okunamayan sensör GEÇTİ değil UYARI")
+
+    sizan = dyn.degerlendir(kosu(ram_dusus=80), 0)
+    r.kontrol(eksen(sizan, "bellek sızıntısı") == dyn.KALDI,
+              "bellek düşüşü sızıntı olarak yakalanıyor")
+
+    yavaslayan = dyn.degerlendir(kosu(gecikme_artis=1.5), 0)
+    r.kontrol(eksen(yavaslayan, "hız sürüklenmesi") == dyn.KALDI,
+              "koşu boyunca yavaşlama yakalanıyor")
+
+    sicak = dyn.degerlendir(kosu(sicaklik=95.0), 0)
+    r.kontrol(eksen(sicak, "sıcaklık") == dyn.KALDI, "aşırı sıcaklık yakalanıyor")
+
+    hatali = dyn.degerlendir(kosu(), 4, "CUDA error")
+    r.kontrol(eksen(hatali, "çıkarım hataları") == dyn.KALDI,
+              "arada gelen çıkarım hataları raporlanıyor")
+    r.kontrol(dyn.ozet_durum(hatali) == dyn.KALDI,
+              "tek bir KALDI özeti KALDI yapıyor")
+    r.kontrol(dyn.ozet_durum(saglikli) == dyn.UYARI,
+              "sensör okunamayınca özet GEÇTİ değil UYARI")
+
+    r.kontrol(dyn.degerlendir([], 0)[0][1] == dyn.UYARI,
+              "örnek yoksa geçmiş sayılmıyor")
+
+    kok = tempfile.mkdtemp(prefix="boxify_soak_")
+    try:
+        yol = dyn.csv_yaz(os.path.join(kok, "alt", "saglik.csv"), kosu())
+        r.kontrol(bool(yol) and os.path.exists(yol),
+                  "sağlık örnekleri CSV olarak yazılıyor")
+        with open(yol, encoding="utf-8") as f:
+            r.kontrol(len(f.read().strip().splitlines()) == 13,
+                      "CSV başlık + bütün örnekleri içeriyor")
+    finally:
+        shutil.rmtree(kok, ignore_errors=True)
+
+    # araçtaki alan
+    from boxify.araclar.model_export import MainWindow
+    w = MainWindow()
+    r.kontrol(getattr(w, "soak_spin", None) is not None
+              and w.soak_spin.value() == 0,
+              "Model Export'ta dayanıklılık alanı var ve varsayılan kapalı")
+    w.close()
+
+
 def main() -> int:
     r = Rapor("Geçmiş, MLflow ve sıfır-atış")
     app = QApplication.instance() or QApplication([])
@@ -416,6 +496,7 @@ def main() -> int:
     model_secici_testi(r, app)
     mlflow_yayilim_testi(r, app)
     kararlilik_testi(r, app)
+    dayaniklilik_olcum_testi(r, app)
     return r.bitir()
 
 

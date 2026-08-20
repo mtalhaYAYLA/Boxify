@@ -1042,6 +1042,19 @@ SOZLUK = {
     "aranacak nesneler, virgülle: forklift, baret, palet":
         "objects to find, comma separated: forklift, helmet, pallet",
     "Ağırlık": "Weights",
+    "Dayanıklılık koşusu": "Endurance run",
+    "0 = normal hız ölçümü (tekrar sayısı kadar koşar).\n\n"
+    "0'dan büyükse dayanıklılık koşusu: model bu süre boyunca aralıksız\n"
+    "çalışır, bellek/takas/sıcaklık örneklenir ve sonunda bir\n"
+    "GEÇTİ/UYARI/KALDI değerlendirmesi çıkar.\n\n"
+    "Hız ölçümü 'ne kadar hızlı' sorusunu cevaplar; bu, 'uzun koşuda\n"
+    "ayakta mı' sorusunu. Sahaya giden bir sistemde ikincisi belirleyici.":
+        "0 = normal speed measurement (runs for the iteration count).\n\n"
+        "Above 0 it becomes an endurance run: the model runs continuously for\n"
+        "this long, memory/swap/temperature are sampled, and a PASS/WARN/FAIL\n"
+        "verdict is produced at the end.\n\n"
+        "Speed measurement answers 'how fast'; this answers 'does it hold up\n"
+        "over a long run'. For a system going to the field, the latter decides.",
     "%d ağırlık listede — süzmek için yaz (ör. yolo26); listede "
     "olmayan bir ad ya da yol da yazılabilir.":
         "%d weights listed — type to filter (e.g. yolo26); you can also enter "
