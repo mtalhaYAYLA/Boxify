@@ -120,7 +120,7 @@ def adres_cozumleme_testi(r):
     """Adres metninden doğru adaptör seçiliyor mu?"""
     from boxify.adaptorler import kaynak_ac, kaynak_turleri
     from boxify.adaptorler.kaynak import (KlasorKaynagi, VideoKaynagi,
-                                          KameraKaynagi, HikvisionKaynagi)
+                                          KameraKaynagi, HikrobotKaynagi)
 
     kok = tempfile.mkdtemp(prefix="boxify_mim_")
     try:
@@ -139,7 +139,7 @@ def adres_cozumleme_testi(r):
             ("kamera:0", KameraKaynagi, "USB kamera"),
             ("0", KameraKaynagi, "sade indeks"),
             ("rtsp://a/b", KameraKaynagi, "RTSP"),
-            ("hik:192.168.1.64", HikvisionKaynagi, "Hikvision"),
+            ("hik:192.168.1.64", HikrobotKaynagi, "Hikrobot"),
         ]
         for adres, tur, ad in esleme:
             r.kontrol(isinstance(kaynak_ac(adres), tur),
@@ -253,6 +253,64 @@ def canli_yakalama_testi(r, app):
         shutil.rmtree(kok, ignore_errors=True)
 
 
+def hikrobot_sdk_testi(r):
+    """MVS SDK bulma mantığı ve SDK yokken davranış.
+
+    SDK bir kurulum paketi: pip'te yok, depoda tutulamaz. Yapılabilecek tek
+    doğru şey onu bulmak ve bulamayınca nereye baktığını söylemek.
+    """
+    from boxify.adaptorler.kaynak import (mvs_sdk_yollari, mvs_yukle,
+                                          HikrobotKaynagi, kaynak_ac)
+
+    yollar = mvs_sdk_yollari()
+    r.kontrol(len(yollar) >= 1, "SDK için aranacak yollar üretiliyor",
+              " · ".join(yollar))
+    r.kontrol(all("MvImport" in y for y in yollar),
+              "yollar SDK'nın Python sarmalayıcı klasörünü gösteriyor")
+
+    eski = os.environ.get("MVCAM_SDK_PATH")
+    os.environ["MVCAM_SDK_PATH"] = "/ozel/mvs/yolu"
+    try:
+        ozel = mvs_sdk_yollari()
+        r.kontrol(any("/ozel/mvs/yolu" in y for y in ozel),
+                  "MVCAM_SDK_PATH ortam değişkeni dikkate alınıyor")
+        r.kontrol(ozel[0].startswith("/ozel/mvs/yolu"),
+                  "özel yol varsayılanın önüne geçiyor")
+    finally:
+        if eski is None:
+            os.environ.pop("MVCAM_SDK_PATH", None)
+        else:
+            os.environ["MVCAM_SDK_PATH"] = eski
+
+    try:
+        mvs_yukle()
+        yuklendi = True
+        mesaj = ""
+    except RuntimeError as e:
+        yuklendi = False
+        mesaj = str(e)
+
+    if yuklendi:
+        r.bilgi("MVS SDK bu makinede kurulu — gerçek kamera testi elle yapılmalı")
+    else:
+        r.kontrol("Bakılan yollar" in mesaj,
+                  "SDK yokken nereye bakıldığı söyleniyor")
+        r.kontrol("MVCAM_SDK_PATH" in mesaj,
+                  "kullanıcıya çözüm yolu veriliyor")
+        r.kontrol("rtsp" in mesaj.lower(),
+                  "güvenlik kamerası için MVS gerekmediği hatırlatılıyor")
+
+    for adres in ("hik:192.168.1.64", "mvs:192.168.1.64", "hikrobot:10.0.0.5"):
+        r.kontrol(isinstance(kaynak_ac(adres), HikrobotKaynagi),
+                  f"{adres.split(':')[0]}: ön eki Hikrobot adaptörüne gidiyor")
+
+    k = HikrobotKaynagi("192.168.1.64")
+    r.kontrol(k.ip == "192.168.1.64" and k._kam is None,
+              "adaptör kurulurken donanıma dokunmuyor (tembel açılış)")
+    k.kapat()
+    r.kontrol(True, "açılmamış kaynağı kapatmak güvenli")
+
+
 def main() -> int:
     from PyQt5.QtWidgets import QApplication
     r = Rapor("Çekirdek ve adaptör mimarisi")
@@ -261,6 +319,7 @@ def main() -> int:
     port_sozlesmesi_testi(r)
     adres_cozumleme_testi(r)
     motor_secimi_testi(r)
+    hikrobot_sdk_testi(r)
     canli_yakalama_testi(r, app)
     return r.bitir()
 

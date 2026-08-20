@@ -665,10 +665,35 @@ Aynı biçimde `.engine` bir model verildiğinde ve donanım uygunsa **ham Tenso
 kullanılıyor (önceden ayrılmış GPU tamponları, tek stream — gecikme dalgalanmasını düşürmenin
 yolu bu); uygun değilse sessizce ultralytics motoruna düşülüyor ve kullanıcı bir şey kaybetmiyor.
 
-> **Doğrulama durumu.** Klasör, video, USB kamera ve RTSP adaptörleri bu makinede sınandı.
-> Hikvision (MVS SDK) ve ham TensorRT adaptörleri, çalışan sürücülerin port karşılığıdır ama
-> ilgili donanım olmadan çalıştırılamadı; ilk kez gerçek kartta koşarken çıktılarını ultralytics
-> motoruyla karşılaştırın.
+### Hikrobot kameralar ve MVS SDK
+
+İki ayrı şey karıştırılmasın:
+
+| Ürün | Nasıl bağlanılır |
+|---|---|
+| **Hikvision** güvenlik/IP kameraları | `rtsp://kullanici:sifre@ip/Streaming/Channels/101` — SDK gerekmez |
+| **Hikrobot** endüstriyel (makine görüşü) kameralar | `hik:192.168.1.64` — **MVS SDK** gerekir |
+
+**MVS SDK depoda tutulamaz**: pip paketi değil, Hikrobot'un kurulum paketidir. Boxify onu
+kurulu olduğu yerde arar:
+
+| Sistem | Aranan yol |
+|---|---|
+| Windows | `C:\Program Files (x86)\MVS\Development\Samples\Python\MvImport` |
+| Linux / Jetson | `/opt/MVS/Samples/<mimari>/Python/MvImport` (Jetson'da `aarch64`) |
+
+Başka bir yere kurduysan `MVCAM_SDK_PATH` ortam değişkenini ayarla. SDK bulunamazsa Boxify
+hangi yollara baktığını tek tek söyler ve güvenlik kamerası için MVS gerekmediğini hatırlatır.
+
+Adaptör iki yol dener: makinede kendi `hik_camera` sarmalayıcın varsa onu kullanır (sahada
+denenmiş kod), yoksa SDK'ya doğrudan gider (cihaz tarama → aç → akış → `MV_CC_GetImageBuffer` →
+BGR'ye çevir).
+
+> **Doğrulama durumu.** Klasör, video, USB kamera ve RTSP adaptörleri bu makinede çalıştırılarak
+> sınandı. Hikrobot (MVS) ve ham TensorRT adaptörleri, çalışan sürücülerin port karşılığıdır;
+> sözleşmeye uydukları test edildi ama **ilgili donanım olmadan çalıştırılamadılar**. İlk kez
+> gerçek kamerada/kartta koşarken çıktılarını gözle doğrulayın — TensorRT'yi ultralytics
+> motoruyla karşılaştırmak en hızlı kontrol.
 
 ---
 

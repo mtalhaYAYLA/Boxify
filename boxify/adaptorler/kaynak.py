@@ -13,7 +13,9 @@ değiştirmeyi gerektirmiyor.
 """
 
 import os
+import sys
 import time
+from ctypes import cast, POINTER
 from typing import Iterator
 
 from ..cekirdek import Kare, KaynakBilgi, KareKaynagi
@@ -22,7 +24,8 @@ GORSEL_UZANTI = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff"}
 VIDEO_UZANTI = {".mp4", ".avi", ".mov", ".mkv", ".m4v", ".wmv", ".flv", ".mpg", ".mpeg"}
 
 ADRES_YARDIMI = (
-    "Klasör yolu · video dosyası · kamera:0 (USB) · rtsp://… · hik:192.168.1.64"
+    "Klasör yolu · video dosyası · kamera:0 (USB) · rtsp://… · "
+    "hik:192.168.1.64 (Hikrobot MVS)"
 )
 
 
@@ -143,44 +146,170 @@ class KameraKaynagi(_OpenCVKaynagi):
         super().__init__(hedef, adres, canli=True, ad=ad)
 
 
-class HikvisionKaynagi(KareKaynagi):
-    """Hikvision (MVS SDK) endüstriyel kamera.
+def mvs_sdk_yollari() -> list:
+    """Hikrobot MVS SDK'sının Python sarmalayıcısının aranacağı yollar.
 
-    SDK yalnızca kurulu olduğu makinede import edilir; yoksa açıkça söyler.
-    Bu makinede donanım olmadığı için doğrulanamadı — kod jetson_test_pack'teki
-    çalışan sürücünün port karşılığıdır.
+    SDK bir kurulum paketidir, depoya konulamaz ve pip'te yoktur — makineye
+    Hikrobot'un MVS kurulumuyla gelir. Buradaki iş onu bulmak.
+
+    Sıra: MVCAM_SDK_PATH ortam değişkeni → işletim sistemi varsayılanı.
+    Linux'ta klasör adı mimariye göre değişiyor (Jetson'da aarch64).
+    """
+    yollar = []
+    ozel = os.environ.get("MVCAM_SDK_PATH")
+    if sys.platform.startswith("win"):
+        kokler = [ozel, r"C:\Program Files (x86)\MVS", r"C:\Program Files\MVS"]
+        for kok in kokler:
+            if kok:
+                yollar.append(os.path.join(kok, "Development", "Samples",
+                                           "Python", "MvImport"))
+    else:
+        try:
+            mimari = os.uname().machine
+        except Exception:
+            mimari = "x86_64"
+        alt = "aarch64" if mimari == "aarch64" else "64"
+        for kok in [ozel, "/opt/MVS"]:
+            if kok:
+                yollar.append(os.path.join(kok, "Samples", alt, "Python", "MvImport"))
+                # Bazı kurulumlarda mimari klasörü yok
+                yollar.append(os.path.join(kok, "Samples", "Python", "MvImport"))
+    return [y for y in yollar if y]
+
+
+def mvs_yukle():
+    """MVS SDK'sını içe aktar. Bulunamazsa nerelere bakıldığını söyleyerek hata ver."""
+    for yol in mvs_sdk_yollari():
+        if not os.path.isdir(yol):
+            continue
+        if yol not in sys.path:
+            sys.path.insert(0, yol)
+        try:
+            import MvCameraControl_class as mvs
+            return mvs
+        except Exception:
+            continue
+    raise RuntimeError(
+        "Hikrobot MVS SDK bulunamadı.\n\n"
+        "SDK bir kurulum paketidir; pip ile gelmez ve depoda tutulamaz. "
+        "Hikrobot'un MVS kurulumunu yapman gerekiyor.\n\n"
+        "Bakılan yollar:\n  " + "\n  ".join(mvs_sdk_yollari()) + "\n\n"
+        "Başka bir yere kurduysan MVCAM_SDK_PATH ortam değişkenini ayarla.\n\n"
+        "Not: Hikvision'ın güvenlik kameraları MVS istemez — onlar için "
+        "rtsp:// adresi kullan.")
+
+
+class HikrobotKaynagi(KareKaynagi):
+    """Hikrobot endüstriyel kamera (MVS SDK).
+
+    İki yol deneniyor: makinede senin `hik_camera` sarmalayıcın varsa o
+    kullanılıyor (sahada denenmiş kod), yoksa SDK'ya doğrudan gidiliyor.
+
+    DOĞRULANMADI: bu adaptör MVS SDK'sı ve gerçek kamera gerektirir; bu
+    makinede ikisi de yok. İlk kez kamerayla koşarken çıktısını gözle
+    doğrula.
     """
 
-    def __init__(self, ip: str, poz_sn: float = None):
-        self.ip = ip
+    def __init__(self, ip: str = "", poz_sn: float = None):
+        self.ip = (ip or "").strip()
         self.poz_sn = poz_sn
         self._kam = None
+        self._sarmalayici = False      # senin hik_camera paketin mi kullanıldı
+        self._mvs = None
+        self._tampon = None
+
+    # ------------------------------------------------------------------ açılış
 
     def ac(self) -> KaynakBilgi:
         try:
             from hik_camera.hik_camera import HikCamera
-        except Exception as e:
-            raise RuntimeError(
-                "Hikvision SDK bulunamadı (hik_camera / MvCameraControl_class).\n"
-                "Kamera yalnızca MVS SDK kurulu makinelerde açılabilir.\n"
-                f"Ayrıntı: {e}")
-        kameralar = HikCamera.get_cams([self.ip]) if self.ip else HikCamera.get_cams()
-        if not kameralar:
-            raise RuntimeError(f"Hikvision kamera bulunamadı: {self.ip or 'otomatik'}")
-        self._kam = list(kameralar.values())[0]
-        self._kam.__enter__()
+        except Exception:
+            HikCamera = None
+
+        if HikCamera is not None:
+            kameralar = HikCamera.get_cams([self.ip]) if self.ip else HikCamera.get_cams()
+            if not kameralar:
+                raise RuntimeError(f"Hikrobot kamera bulunamadı: {self.ip or 'otomatik'}")
+            self._kam = list(kameralar.values())[0]
+            self._kam.__enter__()
+            self._sarmalayici = True
+            if self.poz_sn:
+                try:
+                    self._kam.set_exposure_by_second(self.poz_sn)
+                except Exception:
+                    pass
+            return KaynakBilgi(ad=f"hikrobot {self.ip or 'oto'}",
+                               adres=f"hik:{self.ip}", canli=True)
+
+        return self._ham_ac()
+
+    def _ham_ac(self) -> KaynakBilgi:
+        """SDK'ya doğrudan git: cihazları say, aç, akışı başlat."""
+        from ctypes import byref, memset, sizeof, c_ubyte
+
+        mvs = mvs_yukle()
+        self._mvs = mvs
+
+        liste = mvs.MV_CC_DEVICE_INFO_LIST()
+        memset(byref(liste), 0, sizeof(liste))
+        tur = mvs.MV_GIGE_DEVICE | mvs.MV_USB_DEVICE
+        if mvs.MvCamera.MV_CC_EnumDevices(tur, liste) != 0:
+            raise RuntimeError("MVS cihaz taraması başarısız")
+        if liste.nDeviceNum == 0:
+            raise RuntimeError("Ağda/USB'de Hikrobot kamera bulunamadı")
+
+        secilen = None
+        for i in range(liste.nDeviceNum):
+            bilgi = cast(liste.pDeviceInfo[i],
+                         POINTER(mvs.MV_CC_DEVICE_INFO)).contents
+            if not self.ip:
+                secilen = bilgi
+                break
+            if bilgi.nTLayerType == mvs.MV_GIGE_DEVICE:
+                ham = bilgi.SpecialInfo.stGigEInfo.nCurrentIp
+                adres = f"{(ham >> 24) & 0xFF}.{(ham >> 16) & 0xFF}." \
+                        f"{(ham >> 8) & 0xFF}.{ham & 0xFF}"
+                if adres == self.ip:
+                    secilen = bilgi
+                    break
+        if secilen is None:
+            raise RuntimeError(f"Belirtilen IP'de kamera yok: {self.ip}")
+
+        kam = mvs.MvCamera()
+        if kam.MV_CC_CreateHandle(secilen) != 0:
+            raise RuntimeError("Kamera tanıtıcısı oluşturulamadı")
+        if kam.MV_CC_OpenDevice(mvs.MV_ACCESS_Exclusive, 0) != 0:
+            kam.MV_CC_DestroyHandle()
+            raise RuntimeError("Kamera açılamadı (başka bir uygulama kullanıyor olabilir)")
+
         if self.poz_sn:
             try:
-                self._kam.set_exposure_by_second(self.poz_sn)
+                kam.MV_CC_SetEnumValueByString("ExposureAuto", "Off")
+                kam.MV_CC_SetFloatValue("ExposureTime", float(self.poz_sn) * 1e6)
             except Exception:
                 pass
-        return KaynakBilgi(ad=f"hik {self.ip}", adres=f"hik:{self.ip}", canli=True)
+
+        if kam.MV_CC_StartGrabbing() != 0:
+            kam.MV_CC_CloseDevice()
+            kam.MV_CC_DestroyHandle()
+            raise RuntimeError("Akış başlatılamadı")
+
+        self._kam = kam
+        self._sarmalayici = False
+        return KaynakBilgi(ad=f"hikrobot {self.ip or 'oto'}",
+                           adres=f"hik:{self.ip}", canli=True)
+
+    # ------------------------------------------------------------------ kareler
 
     def kareler(self) -> Iterator[Kare]:
         i = 0
         while self._kam is not None:
+            goruntu = None
             try:
-                goruntu = self._kam.robust_get_frame()
+                if self._sarmalayici:
+                    goruntu = self._kam.robust_get_frame()
+                else:
+                    goruntu = self._ham_kare()
             except Exception:
                 return
             if goruntu is None:
@@ -189,13 +318,48 @@ class HikvisionKaynagi(KareKaynagi):
                        kaynak=f"hik:{self.ip}")
             i += 1
 
+    def _ham_kare(self):
+        """SDK'dan tek kare al ve BGR'ye çevir."""
+        from ctypes import byref, memset, sizeof, cast, POINTER, c_ubyte
+
+        mvs = self._mvs
+        cerceve = mvs.MV_FRAME_OUT()
+        memset(byref(cerceve), 0, sizeof(cerceve))
+        if self._kam.MV_CC_GetImageBuffer(cerceve, 1000) != 0:
+            return None
+        try:
+            bilgi = cerceve.stFrameInfo
+            g, y = bilgi.nWidth, bilgi.nHeight
+            hedef = (c_ubyte * (g * y * 3))()
+            cevir = mvs.MV_CC_PIXEL_CONVERT_PARAM()
+            memset(byref(cevir), 0, sizeof(cevir))
+            cevir.nWidth, cevir.nHeight = g, y
+            cevir.pSrcData = cerceve.pBufAddr
+            cevir.nSrcDataLen = bilgi.nFrameLen
+            cevir.enSrcPixelType = bilgi.enPixelType
+            cevir.enDstPixelType = mvs.PixelType_Gvsp_BGR8_Packed
+            cevir.pDstBuffer = hedef
+            cevir.nDstBufferSize = g * y * 3
+            if self._kam.MV_CC_ConvertPixelType(cevir) != 0:
+                return None
+            import numpy as np
+            return np.frombuffer(hedef, dtype=np.uint8).reshape(y, g, 3).copy()
+        finally:
+            self._kam.MV_CC_FreeImageBuffer(cerceve)
+
     def kapat(self) -> None:
-        if self._kam is not None:
-            try:
+        if self._kam is None:
+            return
+        try:
+            if self._sarmalayici:
                 self._kam.__exit__(None, None, None)
-            except Exception:
-                pass
-            self._kam = None
+            else:
+                self._kam.MV_CC_StopGrabbing()
+                self._kam.MV_CC_CloseDevice()
+                self._kam.MV_CC_DestroyHandle()
+        except Exception:
+            pass
+        self._kam = None
 
 
 def kaynak_turleri() -> list:
@@ -205,7 +369,7 @@ def kaynak_turleri() -> list:
         ("video", "Video dosyası"),
         ("kamera", "Yerel kamera (USB) — kamera:0"),
         ("rtsp", "Ağ kamerası — rtsp://kullanici:sifre@ip/stream"),
-        ("hik", "Hikvision (MVS SDK) — hik:192.168.1.64"),
+        ("hik", "Hikrobot endüstriyel kamera (MVS SDK) — hik:192.168.1.64"),
     ]
 
 
@@ -220,8 +384,8 @@ def kaynak_ac(adres: str, alt_klasorler: bool = False) -> KareKaynagi:
         raise ValueError("Kaynak adresi boş")
 
     kucuk = adres.lower()
-    if kucuk.startswith("hik:"):
-        return HikvisionKaynagi(adres.split(":", 1)[1])
+    if kucuk.startswith(("hik:", "mvs:", "hikrobot:")):
+        return HikrobotKaynagi(adres.split(":", 1)[1])
     if kucuk.startswith("kamera:") or kucuk.startswith(("rtsp://", "http://", "https://")):
         return KameraKaynagi(adres)
     if adres.isdigit():                       # sade "0" da kamera sayılır
