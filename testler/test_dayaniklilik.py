@@ -195,11 +195,26 @@ def zoom_geri_al_testi(r, app):
         app.processEvents()
         r.kontrol(c._zoom > 1.0, "tekerlek yakınlaştırıyor", f"zoom {c._zoom:.2f}")
         sonra_img = c._to_img(hedef)
-        kayma = max(abs(once_img.x() - sonra_img.x()),
-                    abs(once_img.y() - sonra_img.y()))
-        r.kontrol(kayma <= 2, "yakınlaşırken imlecin altındaki nokta sabit kalıyor",
-                  f"({once_img.x()},{once_img.y()}) -> "
-                  f"({sonra_img.x()},{sonra_img.y()}), kayma {kayma}px")
+
+        # Sözleşme "nokta her koşulda sabit kalır" değil: noktayı sabit tutmak
+        # görüntünün dışında boşluk göstermeyi gerektiriyorsa kaydırma
+        # sınırlanır ve nokta kayar. Doğru olan bu; test de bunu söylemeli.
+        def kenara_yaslandi(eksen):
+            if eksen == "x":
+                boy, tuval, ofset = (c.pixmap.width() * c._scale, c.width(), c._ox)
+            else:
+                boy, tuval, ofset = (c.pixmap.height() * c._scale, c.height(), c._oy)
+            if boy <= tuval:
+                return False
+            return abs(ofset) < 0.5 or abs(ofset - (tuval - boy)) < 0.5
+
+        for eksen, once_d, sonra_d in (("x", once_img.x(), sonra_img.x()),
+                                       ("y", once_img.y(), sonra_img.y())):
+            kayma = abs(once_d - sonra_d)
+            r.kontrol(kayma <= 2 or kenara_yaslandi(eksen),
+                      f"yakınlaşırken imlecin altındaki nokta sabit kalıyor ({eksen})",
+                      f"{once_d} -> {sonra_d}, kayma {kayma}px, "
+                      f"kenara yaslandı: {kenara_yaslandi(eksen)}")
 
         # 2) yakınlaştırılmışken çizilen kutu görüntüde doğru yere düşüyor
         once = len(w.dataset.current_image.bboxes)

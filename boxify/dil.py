@@ -1043,9 +1043,28 @@ SOZLUK = {
         "objects to find, comma separated: forklift, helmet, pallet",
     "Ağırlık": "Weights",
     "Eğitilmiş modelin yokken kullan. Sonuç taslaktır: düşük eşikle "
-    "çalıştırıp Labelapp'te gözden geçirmek en hızlı yol.":
+    "çalıştırıp Labelapp'te gözden geçirmek en hızlı yol.\n"
+    "İlk kullanımda internet gerekir: ağırlık ve metin gömme modeli "
+    "(~340 MB) inilir, ultralytics ayrıca 'clip' paketini kendisi kurar.":
         "Use it when you have no trained model. The result is a draft: running "
-        "with a low threshold and reviewing in Labelapp is the fastest path.",
+        "with a low threshold and reviewing in Labelapp is the fastest path.\n"
+        "The first run needs internet: the weights and the text embedding model "
+        "(~340 MB) are downloaded and ultralytics installs the 'clip' package "
+        "itself.",
+    "Parametreler, epoch metrikleri ve ağırlıklar çıktı klasörünün\n"
+    "altındaki mlflow/ dizinine yazılır. Sunucu gerekmez; incelemek\n"
+    "için:  mlflow ui --backend-store-uri <çıktı>/mlflow\n\n"
+    "Geçmiş sekmesi buna bağlı değildir — o, ultralytics'in kendi\n"
+    "results.csv dosyalarını okur ve MLflow kurulu olmasa da çalışır.":
+        "Parameters, per-epoch metrics and weights are written to the mlflow/\n"
+        "folder under the output directory. No server needed; to inspect:\n"
+        "  mlflow ui --backend-store-uri <output>/mlflow\n\n"
+        "The History tab does not depend on this — it reads ultralytics' own\n"
+        "results.csv files and works without MLflow installed.",
+    "MLflow kurulu değil. Kurmak için:  pip install mlflow\n"
+    "Kurulu olmaması hiçbir şeyi engellemez; Geçmiş sekmesi yine çalışır.":
+        "MLflow is not installed. To install:  pip install mlflow\n"
+        "Nothing is blocked without it; the History tab still works.",
     "Sınıflar metinden alınacak — modelin kendi listesi kullanılmıyor.":
         "Classes will come from the text — the model's own list is unused.",
     "Metin boş": "Text is empty",

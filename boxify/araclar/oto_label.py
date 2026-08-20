@@ -425,6 +425,8 @@ class MainWindow(QMainWindow):
         self.zs_chk.setToolTip(
             "Eğitilmiş bir modelin yokken kullan: aradığın nesneleri yazarsın,\n"
             "açık sözlüklü model (YOLO-World / YOLOE) onları kutular.\n"
+            "İlk kullanımda ağırlık ve metin gömme modeli inilir (~340 MB) ve\n"
+            "ultralytics 'clip' paketini kendisi kurar — internet gerekir.\n"
             "Sonuç taslaktır — Labelapp'te gözden geçir.")
         self.zs_chk.toggled.connect(self._zs_degisti)
         gz.addWidget(self.zs_chk)
@@ -449,7 +451,9 @@ class MainWindow(QMainWindow):
 
         self.zs_bilgi = QLabel(
             "Eğitilmiş modelin yokken kullan. Sonuç taslaktır: düşük eşikle "
-            "çalıştırıp Labelapp'te gözden geçirmek en hızlı yol.")
+            "çalıştırıp Labelapp'te gözden geçirmek en hızlı yol.\n"
+            "İlk kullanımda internet gerekir: ağırlık ve metin gömme modeli "
+            "(~340 MB) inilir, ultralytics ayrıca 'clip' paketini kendisi kurar.")
         self.zs_bilgi.setWordWrap(True)
         self.zs_bilgi.setStyleSheet("color:#6b7686; font-size:11px;")
         gz.addWidget(self.zs_bilgi)

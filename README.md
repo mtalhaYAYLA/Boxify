@@ -345,10 +345,17 @@ Eldeki YOLO modeliyle kareleri tarar, YOLO txt etiketleri üretir. Düşük güv
 kaçırılmış nesneyi çizmekten kolaydır. İlk turda hazır bir COCO modeli bile işe yarar.
 
 **Metinle Ara (sıfır-atış)** — hiç modelin yokken de ön etiketleme yapılabilir: aradığın nesneleri
-virgülle yazarsın (`forklift, baret, palet`), açık sözlüklü model onları kutular. Bunun için ek
-paket gerekmez — zaten zorunlu bağımlılığımız olan `ultralytics` içinde YOLO-World ve YOLOE var;
-ağırlık listeden seçilir ve ilk çalıştırmada kendiliğinden inilir. Çıkan etiketler taslaktır,
-Labelapp'te gözden geçirilmelidir.
+virgülle yazarsın (`forklift, baret, palet`), açık sözlüklü model onları kutular. Ağırlık listeden
+seçilir; kurulu değilse ilk çalıştırmada inilir.
+
+Bunun için `requirements.txt`'ye bir şey **eklemek** gerekmiyor: YOLO-World ve YOLOE zaten
+`ultralytics`'in içinde. Ama bedava da değil — sınıf adlarını gömmek için CLIP kullanılıyor ve
+ultralytics ilk çalıştırmada `clip` paketini **kendiliğinden kurar**, ayrıca ağırlık + metin
+gömme modeli olarak ~340 MB iner. Yani ilk kullanımda internet gerekir ve ortamına birkaç paket
+eklenir. Yine de Grounding DINO yolundan hafiftir: `transformers`, `sentencepiece` ve ayrı bir
+çeviri modeli gelmez.
+
+Çıkan etiketler taslaktır, Labelapp'te gözden geçirilmelidir.
 
 ![Oto Label](gorseller/oto_label.png)
 
@@ -537,6 +544,10 @@ Dil düğmelerinin hemen altında tema seçimi var. Seçim `~/.config/boxify4/ay
 dosyasında dille birlikte saklanır ve dokuz aracın tamamına işler:
 
 ![Koyu tema](gorseller/anasayfa_koyu.png)
+
+Koyu temanın vurgusu mordur — Roboflow benzeri etiketleme araçlarının görsel diline
+yaklaşmak için seçildi. Açık tema bilinçli olarak mavi ve düşük parlamalı kalır; gündüz
+uzun süre çalışan kullanıcı için.
 
 Koyu tema, araç kodlarının hiçbirine dokunmadan çalışıyor. Araçlar kendi ayrıntı stillerini
 `setStyleSheet` ile ve renkleri doğrudan yazarak veriyor — 119 çağrı, ~15 ayrı ton. Bunları tek

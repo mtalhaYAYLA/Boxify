@@ -65,8 +65,8 @@ class MainWindow(QMainWindow):
         self.label_panel.class_recolored.connect(self._on_class_recolored)
         splitter.addWidget(self.label_panel)
 
-        # Sol sütun küçük resim ızgarasının iki sütununa göre: 2×104 + boşluklar.
-        splitter.setSizes([248, 772, 200])
+        # Sol sütun ızgaranın iki sütununa göre: 2×(104+10) + kaydırma çubuğu.
+        splitter.setSizes([272, 748, 200])
         vbox.addWidget(splitter)
 
         self.status = QStatusBar()
@@ -180,7 +180,7 @@ class MainWindow(QMainWindow):
 
     def _build_image_list(self) -> QWidget:
         w = QWidget()
-        w.setMaximumWidth(260)
+        w.setMaximumWidth(300)
         w.setMinimumWidth(170)
         vbox = QVBoxLayout(w)
         vbox.setContentsMargins(4, 6, 4, 4)
@@ -221,7 +221,8 @@ class MainWindow(QMainWindow):
         if izgara:
             lw.setViewMode(QListWidget.IconMode)
             lw.setIconSize(KUCUK)
-            lw.setGridSize(QSize(KUCUK.width() + 14, KUCUK.height() + 30))
+            # +10: kaydırma çubuğu payı çıktıktan sonra iki sütun sığsın
+            lw.setGridSize(QSize(KUCUK.width() + 10, KUCUK.height() + 30))
             lw.setResizeMode(QListWidget.Adjust)
             lw.setMovement(QListWidget.Static)
             lw.setWordWrap(False)

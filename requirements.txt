@@ -12,8 +12,10 @@ PyYAML                    # labelapp veri kümesi ve data.yaml okuma/yazma
 #                         # Kurulu değilse kutu kapalı görünür, başka hiçbir şey
 #                         # etkilenmez — Geçmiş sekmesi results.csv'den beslenir.
 #
-# Metinle sıfır-atış etiketleme (Oto Label) EK PAKET İSTEMEZ: YOLO-World ve
-# YOLOE zaten ultralytics'in içinde gelir, ağırlık ilk kullanımda inilir.
+# Metinle sıfır-atış etiketleme (Oto Label) buraya bir şey eklemeyi gerektirmez:
+# YOLO-World ve YOLOE zaten ultralytics'in içinde. Ancak ilk kullanımda
+# ultralytics `clip` paketini kendiliğinden kurar ve ~340 MB ağırlık + metin
+# gömme modeli iner — o yüzden ilk çalıştırma internet ister.
 #
 # Sistem paketi — pip kuramaz, ayrıca kurulmalı:
 #   ffmpeg   Video Kırpıcı ve Kare Alıcı bunu kullanır. Yoksa o iki araç

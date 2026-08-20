@@ -899,6 +899,9 @@ class MainWindow(QMainWindow):
         v.addWidget(self.egri, 2)
 
         self.tabs = QTabWidget()
+        # Seçili sekme kalın yazılıyor; genişlik ince yazıya göre
+        # hesaplandığı için başlık kırpılıyordu ("Geçmiş" -> "Geç...").
+        self.tabs.setElideMode(Qt.ElideNone)
         self.report_box = QTextEdit()
         self.report_box.setReadOnly(True)
         self.report_box.setStyleSheet("font-family:monospace; font-size:11px;")
@@ -995,7 +998,13 @@ class MainWindow(QMainWindow):
                     anahtarlar.append(a)
 
         tablo.setColumnCount(1 + len(turlar))
-        tablo.setHorizontalHeaderLabels(["Ayar"] + [t["ad"] for t in turlar])
+        # Tur adları uzun ve hepsi aynı ön ekle başlıyor; ön eki atınca
+        # yan yana daha çok tur sığıyor (tam ad ipucunda duruyor).
+        basliklar = [t["ad"][len("egitim_"):] if t["ad"].startswith("egitim_")
+                     else t["ad"] for t in turlar]
+        tablo.setHorizontalHeaderLabels(["Ayar"] + basliklar)
+        for sutun, tur in enumerate(turlar):
+            tablo.horizontalHeaderItem(1 + sutun).setToolTip(tur["ad"])
         tablo.setRowCount(len(anahtarlar))
         for satir, anahtar in enumerate(anahtarlar):
             degerler = [t["param"].get(anahtar, "—") for t in turlar]
@@ -1014,6 +1023,11 @@ class MainWindow(QMainWindow):
                     yazi = hucre.font(); yazi.setBold(True); hucre.setFont(yazi)
                 tablo.setItem(satir, 1 + sutun, hucre)
         tablo.resizeColumnsToContents()
+        # Sınırlamazsak sütunlar o kadar genişliyor ki ekrana tek tur bile
+        # sığmıyor — oysa tablonun bütün amacı turları yan yana görmek.
+        for sutun in range(tablo.columnCount()):
+            tablo.setColumnWidth(sutun, min(tablo.columnWidth(sutun),
+                                            96 if sutun == 0 else 116))
 
     def _gecmisi_tazele(self):
         self._gecmis = gecmis_tara(self._proje)
