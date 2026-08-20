@@ -1043,6 +1043,22 @@ SOZLUK = {
         "objects to find, comma separated: forklift, helmet, pallet",
     "Ağırlık": "Weights",
     "Dayanıklılık koşusu": "Endurance run",
+    # ── Canlı kaynak (kamera / RTSP / SDK) ──
+    "Canlı Kaynaktan Yakala": "Capture from a Live Source",
+    "● Canlı Yakala": "● Capture Live",
+    "■ Durdur": "■ Stop",
+    "Adet": "Count",
+    "Aralık": "Interval",
+    "Kamera, ağ akışı ya da SDK'dan doğrudan veri seti üret.":
+        "Build a dataset straight from a camera, a network stream or an SDK.",
+    "Kaynak yok": "No source",
+    "Kaynak açılamadı": "Source could not be opened",
+    "Bir kaynak adresi yaz: kamera:0, rtsp://… ya da hik:192.168.1.64":
+        "Type a source address: kamera:0, rtsp://… or hik:192.168.1.64",
+    "Karelerin kaydedileceği klasör": "Folder to save the frames in",
+    "Kaynak açılıyor…": "Opening the source…",
+    "Durduruluyor…": "Stopping…",
+    "Açılamadı.": "Could not open.",
     # ── İlgi alanı (ROI) ──
     "Yalnızca ilgi alanı (ROI) içi": "Region of interest (ROI) only",
     "Çiz…": "Draw…",

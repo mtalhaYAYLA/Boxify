@@ -338,6 +338,12 @@ birbirinin kopyasıdır ve veri setini şişirir.
 
 ![Kare Alıcı](gorseller/kare_alici.png)
 
+**Canlı kaynaktan yakala** — kare yalnızca dosyadan gelmek zorunda değil. Sağ paneldeki adres
+alanına `kamera:0` (USB), `rtsp://kullanici:sifre@ip/stream` ya da `hik:192.168.1.64` yazıp
+doğrudan veri seti üretebilirsin: verilen aralıkla verilen sayıda kare yakalanır. Canlı kaynakta
+aralık **zamana** göre işler (kamera fps'i değişince sıklık kaymasın diye), dosyada kare
+sayısına göre.
+
 ### ⚡ Oto Label — mevcut modelle kareleri ön etiketle
 
 Eldeki YOLO modeliyle kareleri tarar, YOLO txt etiketleri üretir. Düşük güven eşiğiyle (örn. 0.25)
@@ -628,6 +634,41 @@ doğruluğunu değil, Boxify'ın modelle doğru konuşup konuşmadığını sın
 sızıntısız bölme, sınıf eşleme, fare isabeti, araç geçişlerindeki donma, üç platformun
 eşitliği, dört dil/tema kombinasyonu, yol hafızası. Hangi testin neyi koruduğu
 [`testler/README.md`](testler/README.md) içinde tek tek yazılı.
+
+---
+
+## Mimari — çekirdek ve adaptörler
+
+Boxify dışarıya iki yerden bağlanıyor: **kareyi nereden aldığı** ve **çıkarımı neyin yaptığı**.
+Bu iki yer port olarak tanımlı; geri kalan her şey (etiket dosyaları, veri seti düzeni, raporlar)
+zaten kendi içinde.
+
+```text
+boxify/cekirdek/     portlar + veri tipleri — PyQt5, ultralytics, tensorrt, cv2 İMPORT EDİLMEZ
+   portlar.py           KareKaynagi · CikarimMotoru
+   tipler.py            Kare · Tespit · KaynakBilgi
+
+boxify/adaptorler/   portların somut karşılıkları
+   kaynak.py            klasör · video · USB kamera · RTSP · Hikvision (MVS SDK)
+   cikarim.py           ultralytics · ham TensorRT
+```
+
+Kural yorumda değil testte duruyor: `testler/test_mimari.py` çekirdeğin import satırlarını
+tarıyor ve arayüz/donanım paketi görürse düşüyor. Ayrıca çekirdeği ayrı bir süreçte tek başına
+import edip çalıştığını doğruluyor.
+
+Pratikte kazandırdığı: **kaynak adresi tek bir metin alanı.** Kullanıcı `kamera:0`, `rtsp://…`
+ya da `hik:192.168.1.64` yazıyor; hangi adaptörün açılacağına adres karar veriyor. Yeni bir
+kamera türü eklemek ne arayüzü ne araçları değiştiriyor — `kaynak.py`'ye bir sınıf ekleniyor.
+
+Aynı biçimde `.engine` bir model verildiğinde ve donanım uygunsa **ham TensorRT** yolu
+kullanılıyor (önceden ayrılmış GPU tamponları, tek stream — gecikme dalgalanmasını düşürmenin
+yolu bu); uygun değilse sessizce ultralytics motoruna düşülüyor ve kullanıcı bir şey kaybetmiyor.
+
+> **Doğrulama durumu.** Klasör, video, USB kamera ve RTSP adaptörleri bu makinede sınandı.
+> Hikvision (MVS SDK) ve ham TensorRT adaptörleri, çalışan sürücülerin port karşılığıdır ama
+> ilgili donanım olmadan çalıştırılamadı; ilk kez gerçek kartta koşarken çıktılarını ultralytics
+> motoruyla karşılaştırın.
 
 ---
 

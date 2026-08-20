@@ -104,6 +104,88 @@ class ExtractWorker(QThread):
         self.finished.emit(self.out_dir, saved)
 
 
+class CanliYakalaIscisi(QThread):
+    """Canlı bir kaynaktan (kamera/RTSP/SDK) belirli aralıklarla kare yakalar.
+
+    Kaynağın ne olduğunu bilmiyor: `boxify.cekirdek.KareKaynagi` portunu
+    uyguluyorsa buradan yakalanabiliyor. Yeni bir kamera türü eklemek bu
+    dosyayı değiştirmiyor.
+    """
+
+    log = pyqtSignal(str)
+    ilerleme = pyqtSignal(int, int)
+    bitti = pyqtSignal(int, str)          # yazılan kare sayısı, klasör
+    hata = pyqtSignal(str)
+
+    def __init__(self, adres: str, cikti: str, adet: int, aralik_sn: float,
+                 bicim: str = "jpg"):
+        super().__init__()
+        self.adres = adres
+        self.cikti = cikti
+        self.adet = adet
+        self.aralik_sn = aralik_sn
+        self.bicim = bicim
+        self._iptal = False
+
+    def iptal(self):
+        self._iptal = True
+
+    def run(self):
+        import time as _t
+        import cv2
+        import numpy as np
+        from ..adaptorler import kaynak_ac
+
+        try:
+            kaynak = kaynak_ac(self.adres)
+        except Exception as e:
+            self.hata.emit(str(e))
+            return
+
+        yazilan = 0
+        try:
+            with kaynak as k:
+                bilgi = k.bilgi
+                self.log.emit(f"Kaynak açıldı: {bilgi.ad} "
+                              f"({'canlı' if bilgi.canli else 'dosya'})")
+                os.makedirs(self.cikti, exist_ok=True)
+                damga = _t.strftime("%Y%m%d_%H%M%S")
+                son_yazim = 0.0
+                for kare in k.kareler():
+                    if self._iptal:
+                        self.log.emit("İptal edildi.")
+                        break
+                    simdi = _t.perf_counter()
+                    # Aralık kuralı canlı kaynakta zamana, dosyada kare
+                    # sayısına göre işler; canlıda "her N'inci kare" demek
+                    # kamera fps'i değişince farklı sıklık verirdi.
+                    if bilgi.canli:
+                        if son_yazim and (simdi - son_yazim) < self.aralik_sn:
+                            continue
+                    elif kare.indeks % max(1, int(self.aralik_sn)) != 0:
+                        continue
+                    son_yazim = simdi
+
+                    ad = f"{damga}_{yazilan:05d}.{self.bicim}"
+                    yol = os.path.join(self.cikti, ad)
+                    try:
+                        ok, tampon = cv2.imencode("." + self.bicim, kare.goruntu)
+                        if ok:
+                            # imwrite yerine imencode+tofile: Türkçe/boşluklu
+                            # çıktı yollarında imwrite sessizce başarısız oluyor
+                            tampon.tofile(yol)
+                            yazilan += 1
+                    except Exception as e:
+                        self.log.emit(f"Kare yazılamadı: {e}")
+                    self.ilerleme.emit(yazilan, self.adet)
+                    if yazilan >= self.adet:
+                        break
+        except Exception as e:
+            self.hata.emit(f"{type(e).__name__}: {e}")
+            return
+        self.bitti.emit(yazilan, self.cikti)
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -241,6 +323,45 @@ class MainWindow(QMainWindow):
         v.setContentsMargins(8, 8, 8, 8)
         v.setSpacing(10)
 
+        # ── Canlı kaynak grubu
+        grp_canli = QGroupBox("Canlı Kaynaktan Yakala")
+        cv_ = QVBoxLayout(grp_canli)
+        cv_.setSpacing(6)
+
+        from ..adaptorler import ADRES_YARDIMI
+        self.kaynak_edit = QLineEdit()
+        self.kaynak_edit.setPlaceholderText("kamera:0  ·  rtsp://…  ·  hik:192.168.1.64")
+        self.kaynak_edit.setToolTip(
+            "Kare kaynağı adresi.\n" + ADRES_YARDIMI + "\n\n"
+            "Kaynak türü adresten anlaşılır; yeni bir kamera türü eklemek bu\n"
+            "alanı değiştirmez.")
+        cv_.addWidget(self.kaynak_edit)
+
+        satir_c = QHBoxLayout()
+        satir_c.addWidget(QLabel("Adet"))
+        self.canli_adet = QSpinBox()
+        self.canli_adet.setRange(1, 100000)
+        self.canli_adet.setValue(50)
+        satir_c.addWidget(self.canli_adet)
+        satir_c.addWidget(QLabel("Aralık"))
+        self.canli_aralik = QDoubleSpinBox()
+        self.canli_aralik.setRange(0.05, 600.0)
+        self.canli_aralik.setValue(1.0)
+        self.canli_aralik.setSuffix(" sn")
+        satir_c.addWidget(self.canli_aralik)
+        cv_.addLayout(satir_c)
+
+        self.canli_btn = QPushButton("● Canlı Yakala")
+        self.canli_btn.setMinimumHeight(32)
+        self.canli_btn.clicked.connect(self._canli_yakala)
+        cv_.addWidget(self.canli_btn)
+
+        self.canli_lbl = QLabel("Kamera, ağ akışı ya da SDK'dan doğrudan veri seti üret.")
+        self.canli_lbl.setStyleSheet("color:#6b7686; font-size:11px;")
+        self.canli_lbl.setWordWrap(True)
+        cv_.addWidget(self.canli_lbl)
+        v.addWidget(grp_canli)
+
         # ── Ayarlar grubu
         grp = QGroupBox("Kare Çıkarma Ayarları")
         gv = QVBoxLayout(grp)
@@ -335,6 +456,49 @@ class MainWindow(QMainWindow):
 
         self._last_out_dir = None
         return w
+
+    def _canli_yakala(self):
+        """Canlı kaynaktan kare yakalamayı başlat ya da durdur."""
+        isci = getattr(self, "_canli_isci", None)
+        if isci is not None and isci.isRunning():
+            isci.iptal()
+            self.canli_lbl.setText("Durduruluyor…")
+            return
+
+        adres = self.kaynak_edit.text().strip()
+        if not adres:
+            QMessageBox.information(
+                self, "Kaynak yok",
+                "Bir kaynak adresi yaz: kamera:0, rtsp://… ya da hik:192.168.1.64")
+            return
+
+        cikti = QFileDialog.getExistingDirectory(
+            self, "Karelerin kaydedileceği klasör", self._last_out_dir or "")
+        if not cikti:
+            return
+
+        self._canli_isci = CanliYakalaIscisi(
+            adres, cikti, int(self.canli_adet.value()),
+            float(self.canli_aralik.value()), self.fmt_combo.currentText())
+        self._canli_isci.log.connect(self.status.showMessage)
+        self._canli_isci.ilerleme.connect(
+            lambda a, t: self.canli_lbl.setText(f"{a} / {t} kare yakalandı"))
+        self._canli_isci.hata.connect(self._canli_hata)
+        self._canli_isci.bitti.connect(self._canli_bitti)
+        self._canli_isci.finished.connect(
+            lambda: self.canli_btn.setText("● Canlı Yakala"))
+        self.canli_btn.setText("■ Durdur")
+        self.canli_lbl.setText("Kaynak açılıyor…")
+        self._canli_isci.start()
+
+    def _canli_hata(self, mesaj: str):
+        self.canli_lbl.setText("Açılamadı.")
+        QMessageBox.critical(self, "Kaynak açılamadı", mesaj)
+
+    def _canli_bitti(self, adet: int, klasor: str):
+        self._last_out_dir = klasor
+        self.canli_lbl.setText(f"{adet} kare yazıldı.")
+        self.status.showMessage(f"{adet} kare → {klasor}")
 
     def _build_menu(self):
         mb = self.menuBar()
