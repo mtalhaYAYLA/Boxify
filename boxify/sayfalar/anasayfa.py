@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QPixmap
 
-from .. import SURUM
+from .. import SURUM, YAZAR
 from ..araclar import ARACLAR
 from ..dil import tr
 
@@ -97,7 +97,7 @@ class AnaSayfa(QScrollArea):
         baslik.setObjectName("AnaBaslik")
         alt = QLabel(
             tr("Nesne tespiti için veri seti ve model atölyesi")
-            + f" — {tr('sürüm')} {SURUM}\n"
+            + f" — {tr('sürüm')} {SURUM}  ·  {YAZAR}\n"
             + tr("Hangi nesneyle çalışırsan çalış — balon, araç, ürün, kusur — "
                  "videodan hazır modele giden her adım tek çatı altında.")
         )

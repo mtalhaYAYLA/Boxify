@@ -19,7 +19,11 @@ karşılaştırma ve model export.
 3.0.0: Model Karşılaştır aracı (aynı videoda 1-3 model, model başına sınıf ve
        çıkarım ayarı) + araç geçişlerindeki donmaların giderilmesi.
 2.0.2: TR/EN arayüz dili desteği (boxify/dil.py eklentisi).
+5.0.0: Çekirdek/adaptör (hexagonal) mimarisi — kare kaynağı ve çıkarım motoru
+       port hâline geldi; canlı kamera (USB/RTSP/Hikrobot MVS) girişi, ilgi
+       alanı (ROI), MLflow kaydı, dayanıklılık koşusu, Labelapp editörü.
 """
 
-SURUM = "4.3.0"
+SURUM = "5.0.0"
 UYGULAMA_ADI = "Boxify"
+YAZAR = "Talha Yayla"

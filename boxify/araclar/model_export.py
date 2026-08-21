@@ -24,6 +24,8 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 
 from ..tema import STYLE  # ortak açık tema — bkz. boxify/tema.py
+from .mlflow_kayit import onay_kutusu, kaydet as mlflow_kaydet
+from . import dayaniklilik as dyn
 from .model_bilgi import cihaz_combo_doldur
 
 IMG_EXTS = (".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff")
@@ -131,6 +133,55 @@ class ExportWorker(QThread):
 
 # ─────────────────────────────────────────────── hız ölçümü
 
+SIVRILME_KATI = 2.0    # medyanın bu katını aşan kare "sivrilme" sayılır
+PENCERE_SAYISI = 6     # sürüklenme için koşunun bölüneceği eşit pencere
+
+
+def yuzdelik(degerler, q: float) -> float:
+    """q. yüzdelik (numpy'siz, doğrusal aradeğerlemeli)."""
+    if not degerler:
+        return 0.0
+    s = sorted(degerler)
+    if len(s) == 1:
+        return s[0]
+    konum = (q / 100.0) * (len(s) - 1)
+    alt = int(konum)
+    ust = min(alt + 1, len(s) - 1)
+    return s[alt] + (s[ust] - s[alt]) * (konum - alt)
+
+
+def kararlilik(sureler) -> dict:
+    """Ortalamanın söylemediğini söyleyen ölçüler.
+
+    Ortalama ve p95, ısınmış ve sabit bir makinede yeterli. Gerçek dağıtım
+    donanımında (özellikle Jetson gibi pasif soğutmalı kartlarda) sorun
+    ortalamada değil kuyruğunda çıkıyor: arada bir gelen sivrilmeler ve
+    ısındıkça yavaşlama. Bu ikisi ölçülmezse ölçüm iyi görünüp sahada
+    tutmuyor.
+
+    - p99 / en_kotu / standart_sapma: kuyruk ne kadar uzun
+    - sivrilme: medyanın iki katını aşan kare sayısı
+    - suruklenme: koşuyu eşit pencerelere bölüp her birinin p50'si; son
+      pencere ilkinden belirgin yüksekse ısınma/kısıtlama var demektir
+    """
+    if not sureler:
+        return {}
+    ortanca = statistics.median(sureler)
+    pencere_boyu = max(1, len(sureler) // PENCERE_SAYISI)
+    pencereler = [statistics.median(sureler[i:i + pencere_boyu])
+                  for i in range(0, len(sureler), pencere_boyu)][:PENCERE_SAYISI]
+    return {
+        "p99": yuzdelik(sureler, 99),
+        "en_kotu": max(sureler),
+        # "sapma" adı bu satırda zaten dönüşüm sapmasına ait; karışmasın
+        "standart_sapma": statistics.pstdev(sureler) if len(sureler) > 1 else 0.0,
+        "sivrilme": sum(1 for v in sureler if v > ortanca * SIVRILME_KATI),
+        "pencereler": pencereler,
+        "suruklenme": (pencereler[-1] / pencereler[0] - 1.0) * 100.0
+                      if len(pencereler) > 1 and pencereler[0] > 0 else 0.0,
+    }
+
+
 class BenchWorker(QThread):
     log = pyqtSignal(str)
     progress = pyqtSignal(int, int)
@@ -195,18 +246,48 @@ class BenchWorker(QThread):
             pre, inf, post, wall = [], [], [], []
             preds = []
             hata = False
-            for i in range(cfg["iters"]):
+            # Dayanıklılık koşusunda tekrar sayısı değil süre belirleyici olur;
+            # asıl soru "kaç karede ne kadar sürdü" değil, "uzun koşuda ne
+            # değişti". Sağlık örnekleri periyodik alınır.
+            soak_sn = float(cfg.get("soak_dk", 0)) * 60.0
+            saglik = []
+            hata_sayisi, son_hata = 0, ""
+            t_baslangic = time.perf_counter()
+            son_ornek = 0.0
+            i = -1
+            while True:
+                i += 1
                 if self._cancel:
+                    break
+                if soak_sn > 0:
+                    gecen = time.perf_counter() - t_baslangic
+                    if gecen >= soak_sn:
+                        break
+                elif i >= cfg["iters"]:
                     break
                 path = images[i % len(images)]
                 t0 = time.perf_counter()
                 try:
                     res = self._predict(model, path)
                 except Exception as e:
+                    hata_sayisi += 1
+                    son_hata = str(e)
+                    # Dayanıklılık koşusunda tek bir hata koşuyu bitirmemeli:
+                    # ölçülmek istenen şey zaten "arada hata veriyor mu".
+                    if soak_sn > 0:
+                        if hata_sayisi <= 3:
+                            self.log.emit(f"çıkarım hatası ({hata_sayisi}): {e}")
+                        continue
                     self.log.emit(f"HATA: çıkarım başarısız — {e}")
                     hata = True
                     break
                 wall.append((time.perf_counter() - t0) * 1000.0)
+                if soak_sn > 0:
+                    gecen = time.perf_counter() - t_baslangic
+                    if gecen - son_ornek >= dyn.ORNEK_ARALIGI_SN:
+                        son_ornek = gecen
+                        saglik.append(dyn.saglik_ornegi(gecen, wall[-1]))
+                        self.progress.emit(int(gecen), int(soak_sn))
                 sp = getattr(res, "speed", None) or {}
                 pre.append(float(sp.get("preprocess", 0.0)))
                 inf.append(float(sp.get("inference", 0.0)))
@@ -214,7 +295,8 @@ class BenchWorker(QThread):
                 if cfg["compare"] and i < cfg["compare_n"]:
                     preds.append(self._extract(res))
                 step += 1
-                self.progress.emit(step, total_steps)
+                if soak_sn <= 0:
+                    self.progress.emit(step, total_steps)
 
             if hata or not wall:
                 continue
@@ -227,10 +309,22 @@ class BenchWorker(QThread):
                 "post": statistics.mean(post) if post else 0.0,
                 "toplam": statistics.mean(wall),
                 "medyan": statistics.median(wall),
-                "p95": sorted(wall)[int(0.95 * (len(wall) - 1))],
+                "p95": yuzdelik(wall, 95),
                 "fps": 1000.0 / statistics.mean(wall),
                 "n": len(wall),
             }
+            row.update(kararlilik(wall))
+            if soak_sn > 0:
+                saglik.append(dyn.saglik_ornegi(time.perf_counter() - t_baslangic,
+                                                wall[-1] if wall else None))
+                row["saglik"] = saglik
+                row["degerlendirme"] = dyn.degerlendir(saglik, hata_sayisi, son_hata)
+                row["soak_dk"] = cfg.get("soak_dk", 0)
+                row["hata_sayisi"] = hata_sayisi
+                row["csv"] = dyn.csv_yaz(
+                    os.path.join(os.path.dirname(mpath), "dayaniklilik",
+                                 f"{os.path.splitext(os.path.basename(mpath))[0]}_saglik.csv"),
+                    saglik)
             if cfg["compare"]:
                 if mi == 0:
                     ref_preds = preds
@@ -560,6 +654,23 @@ class MainWindow(QMainWindow):
         self.compare_n_spin.setFixedWidth(90)
         v.addLayout(self._row("Sapma için kare", self.compare_n_spin))
 
+        self.soak_spin = QSpinBox()
+        self.soak_spin.setRange(0, 720)
+        self.soak_spin.setValue(0)
+        self.soak_spin.setFixedWidth(90)
+        self.soak_spin.setSuffix(" dk")
+        self.soak_spin.setToolTip(
+            "0 = normal hız ölçümü (tekrar sayısı kadar koşar).\n\n"
+            "0'dan büyükse dayanıklılık koşusu: model bu süre boyunca aralıksız\n"
+            "çalışır, bellek/takas/sıcaklık örneklenir ve sonunda bir\n"
+            "GEÇTİ/UYARI/KALDI değerlendirmesi çıkar.\n\n"
+            "Hız ölçümü 'ne kadar hızlı' sorusunu cevaplar; bu, 'uzun koşuda\n"
+            "ayakta mı' sorusunu. Sahaya giden bir sistemde ikincisi belirleyici.")
+        v.addLayout(self._row("Dayanıklılık koşusu", self.soak_spin))
+
+        self.mlflow_chk = onay_kutusu()
+        v.addWidget(self.mlflow_chk)
+
         self.bench_btn = QPushButton("⏱  Hızı Ölç")
         self.bench_btn.setMinimumHeight(36)
         self.bench_btn.setStyleSheet(
@@ -728,6 +839,7 @@ class MainWindow(QMainWindow):
             "cpu_threads": int(self.threads_spin.value()),
             "compare": self.compare_chk.isChecked(),
             "compare_n": int(self.compare_n_spin.value()),
+            "soak_dk": int(self.soak_spin.value()),
         }
         self._log(f"── hız ölçümü: {len(models)} model, {cfg['iters']} tekrar, "
                   f"imgsz {cfg['imgsz']} ──")
@@ -745,12 +857,37 @@ class MainWindow(QMainWindow):
         self.progress.setValue(done)
         self.status.showMessage(f"{done}/{total}")
 
+    def _mlflowa_yaz(self, rows: list):
+        """Her ölçülen dosyayı ayrı tur olarak kaydet.
+
+        Hız ölçümü donanıma bağlı olduğu için asıl değeri kıyasta: aynı modelin
+        ONNX'i mi TensorRT'si mi hızlı, ve dönüşüm sapması ne kadar. Tek tura
+        tıkmak o kıyası imkânsız yapardı.
+        """
+        if not (self.mlflow_chk.isChecked() and self.mlflow_chk.isEnabled()):
+            return
+        import time as _t
+        damga = _t.strftime("%Y%m%d_%H%M%S")
+        for satir in rows:
+            ad = os.path.basename(str(satir.get("model", "model")))
+            metrikler = {k: v for k, v in satir.items()
+                         if isinstance(v, (int, float)) and v is not None}
+            notu = mlflow_kaydet(
+                os.path.dirname(str(satir.get("model", ""))) or os.getcwd(),
+                "boxify-model-export", f"{damga}_{ad}",
+                parametreler={"dosya": ad, "boyut": satir.get("boyut", "")},
+                metrikler=metrikler,
+                etiketler={"arac": "model_export"})
+            if notu:
+                self._log(notu)
+
     def _on_bench_result(self, res: dict):
         rows = res.get("rows", [])
         if not rows:
             self.status.showMessage("Ölçüm sonucu yok (loga bak).")
             return
         self.report_box.setPlainText(self._bench_report(rows))
+        self._mlflowa_yaz(rows)
         self.tabs_out.setCurrentIndex(0)
         self.status.showMessage("Ölçüm bitti." + (" (iptal)" if res.get("iptal") else ""))
 
@@ -771,6 +908,32 @@ class MainWindow(QMainWindow):
         L.append("(süreler ms/kare, ortalama; p95 = en yavaş %5'in eşiği)")
         L.append("")
 
+        # Kuyruk ve kararlılık: ortalama iyi görünüp sahada tutmayan ölçümleri
+        # yakalayan kısım. Jetson gibi pasif soğutmalı kartlarda sorun
+        # ortalamada değil, arada gelen sivrilmelerde ve ısındıkça yavaşlamada.
+        if any("p99" in r for r in rows):
+            L.append("── Kararlılık (kuyruk ve sürüklenme) ──")
+            L.append(f"{'model':<28s}{'p95':>8s}{'p99':>8s}{'en kötü':>9s}"
+                     f"{'±std':>8s}{'sivrilme':>10s}{'sürüklenme':>12s}")
+            for r in rows:
+                if "p99" not in r:
+                    continue
+                L.append(f"{os.path.basename(r['model'])[:27]:<28s}"
+                         f"{r['p95']:>8.1f}{r['p99']:>8.1f}{r['en_kotu']:>9.1f}"
+                         f"{r['standart_sapma']:>8.1f}{r['sivrilme']:>10d}"
+                         f"{r['suruklenme']:>11.1f}%")
+            L.append("sivrilme = medyanın 2 katını aşan kare sayısı")
+            L.append("sürüklenme = son pencerenin ilk pencereye göre yavaşlaması")
+            uyari = [r for r in rows if r.get("suruklenme", 0) > 15]
+            if uyari:
+                L.append("")
+                L.append("!! Sürüklenme %15'i aştı: " + ", ".join(
+                    os.path.basename(r["model"]) for r in uyari))
+                L.append("   Bu genellikle ısınma/kısıtlamadır. Ölçümü soğuk cihazda")
+                L.append("   tekrarla; sahadaki sürekli hız ilk pencereninki değil,")
+                L.append("   son pencereninkidir.")
+            L.append("")
+
         base = rows[0]
         if len(rows) > 1:
             L.append("── Referansa göre hızlanma ──")
@@ -790,6 +953,25 @@ class MainWindow(QMainWindow):
         L.append("Not: gerçek sistemde kod çözme (decode), ROI ve I/O da CPU yer; "
                  "bu üst sınırdır.")
         L.append("")
+
+        soaklar = [r for r in rows if r.get("degerlendirme")]
+        if soaklar:
+            L.append("── Dayanıklılık koşusu ──")
+            for r in soaklar:
+                ozet = dyn.ozet_durum(r["degerlendirme"])
+                L.append(f"{os.path.basename(r['model'])}  —  {r['soak_dk']} dk  "
+                         f"→  {ozet}")
+                for eksen, durum, aciklama in r["degerlendirme"]:
+                    isaret = {dyn.GECER: "  ok ", dyn.UYARI: "  !  ",
+                              dyn.KALDI: " !!! "}.get(durum, "     ")
+                    L.append(f"{isaret}{eksen:<22s}{durum:<7s}{aciklama}")
+                L.append(f"      örnek: {len(r.get('saglik') or [])} "
+                         f"({dyn.ORNEK_ARALIGI_SN:g} sn'de bir)"
+                         + (f"   ·   {r['csv']}" if r.get("csv") else ""))
+                L.append("")
+            L.append("KALDI = sahaya çıkmadan önce bakılmalı. UYARI çoğu zaman")
+            L.append("okunamayan bir sensördür; açıklamasını oku.")
+            L.append("")
 
         sapmalar = [r for r in rows if r.get("sapma")]
         if sapmalar:

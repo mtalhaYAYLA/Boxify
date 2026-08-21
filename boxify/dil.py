@@ -425,9 +425,17 @@ SOZLUK = {
 
     # ── Ortak / menüler ──
     "Dosya": "File",
+    "Düzen": "Edit",
     "Çıkış": "Exit",
     "Kaydet": "Save",
     "Tümünü Kaydet": "Save All",
+    "Geri Al": "Undo",
+    "Yinele": "Redo",
+    "Yakınlaştır": "Zoom In",
+    "Uzaklaştır": "Zoom Out",
+    "Sığdır": "Fit",
+    "Geri alınacak bir değişiklik yok.": "Nothing to undo.",
+    "Yinelenecek bir değişiklik yok.": "Nothing to redo.",
     "Hata": "Error",
     "Uyarı": "Warning",
     "Bilgi": "Info",
@@ -1007,15 +1015,191 @@ SOZLUK = {
     "+ Ekle": "+ Add",
     "Adını Değiştir": "Rename",
     "Renk": "Color",
-    "Sol tık: bbox çiz\nSağ tık: menü (sil/sınıf)\nDel: seçili sil\n"
+    "Sol tık: bbox çiz\nSağ tık: menü (sil/sınıf)\n"
+    "Sağ tık + sürükle: kaydır\nTekerlek: yakınlaştır\nCtrl+0: sığdır\n"
+    "Del: seçili sil\nCtrl+Z / Ctrl+Y: geri al / yinele\n"
     "2× tık: adını değiştir\nA / ◀ : önceki\nD / ▶ : sonraki":
         "Left click: draw bbox\nRight click: menu (delete/class)\n"
-        "Del: delete selected\nDouble click: rename\nA / ◀ : previous\n"
-        "D / ▶ : next",
+        "Right drag: pan\nWheel: zoom\nCtrl+0: fit\n"
+        "Del: delete selected\nCtrl+Z / Ctrl+Y: undo / redo\n"
+        "Double click: rename\nA / ◀ : previous\nD / ▶ : next",
+    "Geri al (Ctrl+Z)": "Undo (Ctrl+Z)",
+    "Yinele (Ctrl+Y)": "Redo (Ctrl+Y)",
+    "Yakınlaştır (Ctrl++ veya fare tekerleği)":
+        "Zoom in (Ctrl++ or mouse wheel)",
+    "Uzaklaştır (Ctrl+- veya fare tekerleği)":
+        "Zoom out (Ctrl+- or mouse wheel)",
+    "Sığdır (Ctrl+0). Yakınlaşmışken sağ tuşla sürükleyerek kaydır.":
+        "Fit (Ctrl+0). When zoomed in, right-drag to pan.",
     "Yeni Sınıf": "New Class",
     "Sınıf adı:": "Class name:",
     "Yeni ad:": "New name:",
     "Eğitim Başlat...": "Start Training...",
+    # ── Oto Label: metinle sıfır-atış ──
+    "Metinle Ara (sıfır-atış)": "Search by Text (zero-shot)",
+    "Sınıfları modelden değil, yazdığım metinden al":
+        "Take classes from my text, not from the model",
+    "aranacak nesneler, virgülle: forklift, baret, palet":
+        "objects to find, comma separated: forklift, helmet, pallet",
+    "Ağırlık": "Weights",
+    "Dayanıklılık koşusu": "Endurance run",
+    # ── Canlı kaynak (kamera / RTSP / SDK) ──
+    "Canlı Kaynaktan Yakala": "Capture from a Live Source",
+    "Canlı kaynaktan etiketlemek için Kare Alıcı'da kareleri yakalayıp "
+    "buraya o klasörü ver — böylece etiketlediğin kareler diskte kalır.":
+        "To label from a live source, capture the frames in Frame Grabber and "
+        "point this at that folder — that way the frames you label stay on disk.",
+    "Yalnızca ilgi alanı (ROI) içi": "Region of interest (ROI) only",
+    "Görsel klasörünün yanındaki roi.json kullanılır.\n"
+    "Hem tahminler hem referans kutular elenir: yalnızca tahminleri\n"
+    "elemek, ROI dışındaki her nesneyi 'kaçırıldı' sayardı.":
+        "The roi.json next to the image folder is used.\n"
+        "Both predictions and ground-truth boxes are filtered: filtering only\n"
+        "predictions would count every object outside the ROI as a miss.",
+    "Video dosyasının yanındaki roi.json kullanılır.\n"
+    "Komşu hattaki tespitler modelleri kıyaslarken gürültü olur.":
+        "The roi.json next to the video file is used.\n"
+        "Detections on the neighbouring line are noise when comparing models.",
+    "● Canlı Yakala": "● Capture Live",
+    "■ Durdur": "■ Stop",
+    "Adet": "Count",
+    "Aralık": "Interval",
+    "Kamera, ağ akışı ya da SDK'dan doğrudan veri seti üret.":
+        "Build a dataset straight from a camera, a network stream or an SDK.",
+    "Kaynak yok": "No source",
+    "Kaynak açılamadı": "Source could not be opened",
+    "Bir kaynak adresi yaz: kamera:0, rtsp://… ya da hik:192.168.1.64":
+        "Type a source address: kamera:0, rtsp://… or hik:192.168.1.64",
+    "Karelerin kaydedileceği klasör": "Folder to save the frames in",
+    "Kaynak açılıyor…": "Opening the source…",
+    "Durduruluyor…": "Stopping…",
+    "Açılamadı.": "Could not open.",
+    # ── İlgi alanı (ROI) ──
+    "Yalnızca ilgi alanı (ROI) içi": "Region of interest (ROI) only",
+    "Çiz…": "Draw…",
+    "İlgi Alanı (ROI)": "Region of Interest (ROI)",
+    "Bölgeyi Kapat": "Close Region",
+    "Hepsini Temizle": "Clear All",
+    "ROI yok — bütün kare kullanılıyor": "No ROI — the whole frame is used",
+    "Önce fotoğraf klasörü seç.": "Choose a photo folder first.",
+    "Görsel yok": "No image",
+    "Kare açılamadı": "Frame could not be opened",
+    "Kaydedilemedi": "Could not save",
+    "Açıkken merkezi ROI dışında kalan tespitler yazılmaz.\n"
+    "Kameranın gördüğü alanın çoğu zaman yarısı alakasızdır (komşu hat,\n"
+    "koridor); oradaki tespitler veri setine gürültü olarak girer.":
+        "When on, detections whose centre falls outside the ROI are not written.\n"
+        "Half of what the camera sees is often irrelevant (the neighbouring line,\n"
+        "a corridor); detections there enter the dataset as noise.",
+    "Sol tık nokta koyar · çift tık ya da Enter bölgeyi kapatır · "
+    "sağ tık son noktayı geri alır · Esc çizimi bırakır\n"
+    "Karartılan alan ROI dışıdır: oradaki tespitler kullanılmaz.":
+        "Left click adds a point · double click or Enter closes the region · "
+        "right click undoes the last point · Esc abandons the drawing\n"
+        "The darkened area is outside the ROI: detections there are unused.",
+    "Örnek kare yok — önce bir görsel klasörü seç":
+        "No sample frame — choose an image folder first",
+    "Önce fotoğraf klasörünü seç — ROI bir örnek karenin üstüne çizilir.":
+        "Choose the photo folder first — the ROI is drawn on a sample frame.",
+    "ROI dosyası yazılamadı — klasör yazılabilir mi?":
+        "The ROI file could not be written — is the folder writable?",
+    "Son noktayı ya da son bölgeyi geri alır":
+        "Undoes the last point, or the last region",
+    "Enter ile aynı": "Same as Enter",
+    "0 = normal hız ölçümü (tekrar sayısı kadar koşar).\n\n"
+    "0'dan büyükse dayanıklılık koşusu: model bu süre boyunca aralıksız\n"
+    "çalışır, bellek/takas/sıcaklık örneklenir ve sonunda bir\n"
+    "GEÇTİ/UYARI/KALDI değerlendirmesi çıkar.\n\n"
+    "Hız ölçümü 'ne kadar hızlı' sorusunu cevaplar; bu, 'uzun koşuda\n"
+    "ayakta mı' sorusunu. Sahaya giden bir sistemde ikincisi belirleyici.":
+        "0 = normal speed measurement (runs for the iteration count).\n\n"
+        "Above 0 it becomes an endurance run: the model runs continuously for\n"
+        "this long, memory/swap/temperature are sampled, and a PASS/WARN/FAIL\n"
+        "verdict is produced at the end.\n\n"
+        "Speed measurement answers 'how fast'; this answers 'does it hold up\n"
+        "over a long run'. For a system going to the field, the latter decides.",
+    "%d ağırlık listede — süzmek için yaz (ör. yolo26); listede "
+    "olmayan bir ad ya da yol da yazılabilir.":
+        "%d weights listed — type to filter (e.g. yolo26); you can also enter "
+        "a name or path that is not in the list.",
+    "Metinle tespit edebilen ağırlıklar (YOLO-World / YOLOE).\n"
+    "Listede olmayan bir ad ya da dosya yolu da yazabilirsin.":
+        "Weights that can detect from text (YOLO-World / YOLOE).\n"
+        "You can also type a name or file path that is not in the list.",
+    "ultralytics'in indirebildiği bütün ağırlıklar listede. Kurulu\n"
+    "değilse ilk eğitimde kendiliğinden iner. Listede olmayan bir ad\n"
+    "ya da dosya yolu da yazabilirsin.\n\n"
+    "Parantezli olanlar tespit dışı görevler içindir (poz, segmentasyon,\n"
+    "sınıflandırma); Boxify'ın veri biçimi tespit kutusudur.":
+        "Every weight ultralytics can download is in the list. If it is not\n"
+        "installed it is fetched on the first training run. You can also type\n"
+        "a name or file path that is not in the list.\n\n"
+        "The ones in parentheses are for non-detection tasks (pose, segmentation,\n"
+        "classification); Boxify's data format is detection boxes.",
+    "Eğitilmiş modelin yokken kullan. Sonuç taslaktır: düşük eşikle "
+    "çalıştırıp Labelapp'te gözden geçirmek en hızlı yol.\n"
+    "İlk kullanımda internet gerekir: ağırlık ve metin gömme modeli "
+    "(~340 MB) inilir, ultralytics ayrıca 'clip' paketini kendisi kurar.":
+        "Use it when you have no trained model. The result is a draft: running "
+        "with a low threshold and reviewing in Labelapp is the fastest path.\n"
+        "The first run needs internet: the weights and the text embedding model "
+        "(~340 MB) are downloaded and ultralytics installs the 'clip' package "
+        "itself.",
+    "Parametreler, epoch metrikleri ve ağırlıklar çıktı klasörünün\n"
+    "altındaki mlflow/ dizinine yazılır. Sunucu gerekmez; incelemek\n"
+    "için:  mlflow ui --backend-store-uri <çıktı>/mlflow\n\n"
+    "Geçmiş sekmesi buna bağlı değildir — o, ultralytics'in kendi\n"
+    "results.csv dosyalarını okur ve MLflow kurulu olmasa da çalışır.":
+        "Parameters, per-epoch metrics and weights are written to the mlflow/\n"
+        "folder under the output directory. No server needed; to inspect:\n"
+        "  mlflow ui --backend-store-uri <output>/mlflow\n\n"
+        "The History tab does not depend on this — it reads ultralytics' own\n"
+        "results.csv files and works without MLflow installed.",
+    "MLflow kurulu değil. Kurmak için:  pip install mlflow\n"
+    "Kurulu olmaması hiçbir şeyi engellemez; Geçmiş sekmesi yine çalışır.":
+        "MLflow is not installed. To install:  pip install mlflow\n"
+        "Nothing is blocked without it; the History tab still works.",
+    "Sınıflar metinden alınacak — modelin kendi listesi kullanılmıyor.":
+        "Classes will come from the text — the model's own list is unused.",
+    "Metin boş": "Text is empty",
+    # ── Labelapp: sınıf paneli, araç rayı, görsel silme ──
+    "Sınıf": "Class",
+    "Uygula": "Apply",
+    "sınıf seç ya da yaz": "pick or type a class",
+    "ARAÇLAR": "TOOLS",
+    "Geri Al": "Undo",
+    "Kutuları Taşı": "Carry Boxes",
+    "Görseli Sil": "Delete Image",
+    "Görseli sil": "Delete image",
+    "Bu görseli ve etiketini veri setinden siler":
+        "Deletes this image and its label from the dataset",
+    "Izgara / liste görünümü": "Grid / list view",
+    # ── Eğitim: geçmiş turlar + MLflow ──
+    "Geçmiş": "History",
+    "Tazele": "Refresh",
+    "Tur": "Run",
+    "Epoch": "Epoch",
+    "En iyi mAP50-95": "Best mAP50-95",
+    "Başlangıç": "Start weight",
+    "MLflow'a da kaydet": "Also log to MLflow",
+    "Ölçüm sonuçları çıktı klasörünün altındaki mlflow/ dizinine\n"
+    "yazılır. Sunucu gerekmez; incelemek için:\n"
+    "  mlflow ui --backend-store-uri sqlite:///<çıktı>/mlflow/mlflow.db":
+        "Measurements are written to the mlflow/ folder under the output\n"
+        "directory. No server needed; to inspect:\n"
+        "  mlflow ui --backend-store-uri sqlite:///<output>/mlflow/mlflow.db",
+    "MLflow kurulu değil. Kurmak için:  pip install mlflow\n"
+    "Kurulu olmaması hiçbir aracı engellemez.":
+        "MLflow is not installed. To install:  pip install mlflow\n"
+        "No tool is blocked without it.",
+    "Çıktı klasöründeki turlar. Kıyaslamak için birden fazla satır seç.":
+        "Runs in the output folder. Select more than one row to compare.",
+    "Kıyaslamak için listeden bir ya da birkaç tur seç":
+        "Select one or more runs from the list to compare",
+    "Çıktı klasöründe tamamlanmış tur bulunamadı.":
+        "No completed run found in the output folder.",
+    "Önce bir data.yaml seç — çıktı klasörü ondan belirleniyor.":
+        "Choose a data.yaml first — the output folder is derived from it.",
     "Model Eğitimi": "Model Training",
     "Eğitim Ayarları": "Training Settings",
     "Veri Bölümü (export modunda)": "Data Split (in export mode)",

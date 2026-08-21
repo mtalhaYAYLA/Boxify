@@ -25,9 +25,30 @@ yolu_kur()
 import numpy as np                                                  # noqa: E402
 import cv2                                                          # noqa: E402
 from PyQt5.QtWidgets import QApplication, QMessageBox, QFileDialog  # noqa: E402
-from PyQt5.QtCore import Qt, QPoint, QEvent                         # noqa: E402
-from PyQt5.QtGui import QMouseEvent                                 # noqa: E402
+from PyQt5.QtCore import Qt, QPoint, QPointF, QEvent                # noqa: E402
+from PyQt5.QtGui import QMouseEvent, QWheelEvent                    # noqa: E402
 from PyQt5.QtTest import QTest                                      # noqa: E402
+
+
+def surukle_c(app, c, p1, p2):
+    """Tuval üzerinde fareyle sürükleme.
+
+    QTest.mouseMove düğme basılıyken hareketi offscreen'de iletmiyor;
+    olaylar doğrudan gönderiliyor.
+    """
+    def olay(tur, pos, dugme, dugmeler):
+        return QMouseEvent(tur, pos, dugme, dugmeler, Qt.NoModifier)
+
+    app.sendEvent(c, olay(QEvent.MouseButtonPress, p1,
+                          Qt.LeftButton, Qt.LeftButton))
+    for t in (0.34, 0.67, 1.0):
+        ara = QPoint(int(p1.x() + (p2.x() - p1.x()) * t),
+                     int(p1.y() + (p2.y() - p1.y()) * t))
+        app.sendEvent(c, olay(QEvent.MouseMove, ara, Qt.NoButton, Qt.LeftButton))
+    app.processEvents()
+    app.sendEvent(c, olay(QEvent.MouseButtonRelease, p2,
+                          Qt.LeftButton, Qt.NoButton))
+    app.processEvents()
 
 
 def _kutular_yakala():
@@ -67,21 +88,7 @@ def tuval_testi(r, app):
                 f"{c.pixmap.width()}x{c.pixmap.height()}, ölçek {c._scale:.2f}")
 
         def surukle(p1, p2):
-            # QTest.mouseMove düğme basılıyken hareketi offscreen'de iletmiyor;
-            # olaylar doğrudan gönderiliyor.
-            def olay(tur, pos, dugme, dugmeler):
-                return QMouseEvent(tur, pos, dugme, dugmeler, Qt.NoModifier)
-            app.sendEvent(c, olay(QEvent.MouseButtonPress, p1,
-                                  Qt.LeftButton, Qt.LeftButton))
-            for t in (0.34, 0.67, 1.0):
-                ara = QPoint(int(p1.x() + (p2.x() - p1.x()) * t),
-                             int(p1.y() + (p2.y() - p1.y()) * t))
-                app.sendEvent(c, olay(QEvent.MouseMove, ara,
-                                      Qt.NoButton, Qt.LeftButton))
-            app.processEvents()
-            app.sendEvent(c, olay(QEvent.MouseButtonRelease, p2,
-                                  Qt.LeftButton, Qt.NoButton))
-            app.processEvents()
+            surukle_c(app, c, p1, p2)
 
         # 1) fare ile kutu çiz
         once = len(w.dataset.current_image.bboxes)
@@ -140,6 +147,150 @@ def tuval_testi(r, app):
             app.processEvents()
             r.kontrol(len(w.dataset.current_image.bboxes) == m - 1,
                       "Delete tuşu kutuyu siliyor")
+        w.close()
+    finally:
+        shutil.rmtree(kok, ignore_errors=True)
+
+
+def zoom_geri_al_testi(r, app):
+    """Yakınlaştırma, kaydırma, iç içe kutu seçimi ve geri al/yinele.
+
+    Yakınlaştırma tuvalin bütün koordinat matematiğini etkiliyor: kutu çizmek,
+    seçmek ve taşımak aynı dönüşümden geçiyor. Bu yüzden burada sınanan asıl
+    şey görsel etki değil, **yakınlaştırılmışken çizilen kutunun görüntüde
+    doğru yere düşmesi**.
+    """
+    kok = tempfile.mkdtemp(prefix="boxify_zoom_")
+    try:
+        for i in range(2):
+            cv2.imwrite(os.path.join(kok, f"k{i}.jpg"),
+                        np.random.default_rng(i).integers(
+                            0, 255, (300, 400, 3), dtype=np.uint8))
+        with open(os.path.join(kok, "classes.txt"), "w") as f:
+            f.write("nesne\nikinci\n")
+
+        from boxify.araclar.labelapp import MainWindow
+        from boxify.araclar.labelapp.core.annotation import BBox
+        w = MainWindow()
+        w.resize(1200, 800)
+        w.show()
+        w.dataset.load_folder(kok)
+        w.dataset.load_classes()
+        if not w.dataset.label_classes:
+            w.dataset.auto_detect_classes()   # classes.txt buradan okunuyor
+        w.label_panel.refresh(w.dataset.label_classes)
+        w._refresh_list()
+        w._load(0)
+        app.processEvents()
+        c = w.canvas
+        r.kontrol(bool(w.dataset.label_classes), "sınıflar yüklendi",
+                  ", ".join(lc.name for lc in w.dataset.label_classes))
+
+        # 1) tekerlek yakınlaştırıyor ve imlecin altındaki piksel yerinde kalıyor
+        hedef = QPoint(c.width() // 3, c.height() // 3)
+        once_img = c._to_img(hedef)
+        app.sendEvent(c, QWheelEvent(
+            QPointF(hedef), QPointF(hedef), QPoint(0, 0), QPoint(0, 480),
+            Qt.NoButton, Qt.NoModifier, Qt.NoScrollPhase, False))
+        app.processEvents()
+        r.kontrol(c._zoom > 1.0, "tekerlek yakınlaştırıyor", f"zoom {c._zoom:.2f}")
+        sonra_img = c._to_img(hedef)
+
+        # Sözleşme "nokta her koşulda sabit kalır" değil: noktayı sabit tutmak
+        # görüntünün dışında boşluk göstermeyi gerektiriyorsa kaydırma
+        # sınırlanır ve nokta kayar. Doğru olan bu; test de bunu söylemeli.
+        def kenara_yaslandi(eksen):
+            if eksen == "x":
+                boy, tuval, ofset = (c.pixmap.width() * c._scale, c.width(), c._ox)
+            else:
+                boy, tuval, ofset = (c.pixmap.height() * c._scale, c.height(), c._oy)
+            if boy <= tuval:
+                return False
+            return abs(ofset) < 0.5 or abs(ofset - (tuval - boy)) < 0.5
+
+        for eksen, once_d, sonra_d in (("x", once_img.x(), sonra_img.x()),
+                                       ("y", once_img.y(), sonra_img.y())):
+            kayma = abs(once_d - sonra_d)
+            r.kontrol(kayma <= 2 or kenara_yaslandi(eksen),
+                      f"yakınlaşırken imlecin altındaki nokta sabit kalıyor ({eksen})",
+                      f"{once_d} -> {sonra_d}, kayma {kayma}px, "
+                      f"kenara yaslandı: {kenara_yaslandi(eksen)}")
+
+        # 2) yakınlaştırılmışken çizilen kutu görüntüde doğru yere düşüyor
+        once = len(w.dataset.current_image.bboxes)
+        surukle_c(app, c, c._to_canvas(120, 90), c._to_canvas(240, 200))
+        kutular = w.dataset.current_image.bboxes
+        if r.kontrol(len(kutular) == once + 1,
+                     "yakınlaştırılmışken kutu çizilebiliyor"):
+            k = kutular[-1]
+            sapma = max(abs(k.x1 - 120), abs(k.y1 - 90),
+                        abs(k.x2 - 240), abs(k.y2 - 200))
+            r.kontrol(sapma <= 3, "yakınlaştırılmış çizim doğru koordinatta",
+                      f"({k.x1},{k.y1})-({k.x2},{k.y2}), sapma {sapma}")
+
+        # 3) kaydırma sınırlanıyor — görüntü ekran dışına sürüklenemiyor
+        c._pan_x, c._pan_y = 99999.0, 99999.0
+        c._update_transform()
+        sw = c.pixmap.width() * c._scale
+        sh = c.pixmap.height() * c._scale
+        tasti = (sw > c.width() and c._ox > 0.5) or (sh > c.height() and c._oy > 0.5)
+        r.kontrol(not tasti, "aşırı kaydırma sınırlanıyor",
+                  f"ox {c._ox:.1f}, oy {c._oy:.1f}")
+
+        # 4) sığdır başlangıç durumuna dönüyor
+        c.reset_zoom()
+        r.kontrol(abs(c._zoom - 1.0) < 1e-6 and c._pan_x == 0 and c._pan_y == 0,
+                  "sığdır yakınlaştırmayı ve kaydırmayı sıfırlıyor")
+
+        # 5) sığdırılmış hâlden daha fazla uzaklaşılamıyor
+        c.zoom_step(0.1)
+        r.kontrol(abs(c._zoom - 1.0) < 1e-6,
+                  "sığdırılmış hâlden daha fazla uzaklaşılmıyor",
+                  f"zoom {c._zoom:.2f}")
+
+        # 6) iç içe kutularda küçük olan seçiliyor
+        # (kutular görüntünün sol üstünde tutuluyor: sağ alt yarı, sonraki
+        #  adımların yeni kutu çizebilmesi için boş kalmalı)
+        ann = w.dataset.current_image
+        ann.bboxes = [BBox(20, 20, 200, 150, 0), BBox(60, 50, 100, 90, 0)]
+        c.set_annotations(ann.bboxes, w.dataset.label_classes)
+        secilen = c._bbox_at(c._to_canvas(80, 70))
+        r.kontrol(secilen == 1, "iç içe kutularda küçük olan seçiliyor",
+                  f"seçilen indeks {secilen} (1 olmalı)")
+
+        # 7) geri al / yinele
+        w._yiginlari_temizle()
+        n = len(ann.bboxes)
+        surukle_c(app, c, c._to_canvas(250, 180), c._to_canvas(330, 250))
+        arttti = len(w.dataset.current_image.bboxes)
+        w._geri_al()
+        app.processEvents()
+        geri = len(w.dataset.current_image.bboxes)
+        r.kontrol(arttti == n + 1 and geri == n,
+                  "geri al çizilen kutuyu kaldırıyor", f"{n} -> {arttti} -> {geri}")
+        w._yinele()
+        app.processEvents()
+        r.kontrol(len(w.dataset.current_image.bboxes) == n + 1,
+                  "yinele kutuyu geri getiriyor")
+
+        # 8) seçmek için tıklamak geri al yığınına adım eklemiyor
+        w._yiginlari_temizle()
+        p = c._to_canvas(80, 70)
+        surukle_c(app, c, p, p)
+        r.kontrol(not w._geri_yigin,
+                  "kutuyu seçmek geri al yığınını kirletmiyor",
+                  f"{len(w._geri_yigin)} adım")
+
+        # 9) kare değişince yığın temizleniyor (başka dosyayı geri sarmasın)
+        surukle_c(app, c, c._to_canvas(250, 30), c._to_canvas(330, 100))
+        w._load(1)
+        app.processEvents()
+        r.kontrol(not w._geri_yigin and not w._yinele_yigin,
+                  "kare değişince geri al yığını temizleniyor")
+
+        # 10) yeni karede yakınlaştırma sıfırlanıyor
+        r.kontrol(abs(c._zoom - 1.0) < 1e-6,
+                  "yeni karede yakınlaştırma sığdırılmış hâle dönüyor")
         w.close()
     finally:
         shutil.rmtree(kok, ignore_errors=True)
@@ -243,6 +394,7 @@ def main() -> int:
     app = QApplication.instance() or QApplication([])
     _kutular_yakala()
     tuval_testi(r, app)
+    zoom_geri_al_testi(r, app)
     dayaniklilik_testi(r, app)
     return r.bitir()
 

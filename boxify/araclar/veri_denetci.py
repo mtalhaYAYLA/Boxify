@@ -26,7 +26,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QRectF, QTimer
 from PyQt5.QtGui import QImage, QPainter, QPen, QColor, QFont
 
-from ..tema import STYLE  # ortak açık tema — bkz. boxify/tema.py
+from ..tema import STYLE, renk  # ortak açık tema — bkz. boxify/tema.py
 # Yakın-kopya bulma ve sızıntısız dağıtım tek yerde tutulur; Labelapp'in veri
 # seti dışa aktarımı da aynı modülü kullanır (bkz. veri_bolme.py)
 from .veri_bolme import dhash64, group_duplicates, bolumlere_dagit
@@ -409,9 +409,11 @@ class PreviewCanvas(QWidget):
 
     def paintEvent(self, ev):
         p = QPainter(self)
-        p.fillRect(self.rect(), QColor("#dde1e7"))
+        # Kendi boyamasını yapan widget tema yamasının dışında kalıyor;
+        # renk() olmadan koyu temada açık gri bir kutu olarak sırıtıyordu.
+        p.fillRect(self.rect(), QColor(renk("#dde1e7")))
         if self._img is None:
-            p.setPen(QColor("#6b7686"))
+            p.setPen(QColor(renk("#6b7686")))
             p.drawText(self.rect(), Qt.AlignCenter, self._info)
             return
 

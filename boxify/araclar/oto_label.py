@@ -20,6 +20,7 @@ from PyQt5.QtGui import QImage, QPixmap
 
 from ..tema import STYLE  # ortak açık tema — bkz. boxify/tema.py
 from .model_bilgi import SinifYukleyici, cihaz_combo_doldur
+from . import roi as roi_modulu
 
 IMG_EXTS = (".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff")
 
@@ -28,6 +29,39 @@ MARK_OK = "✓"      # tespit var
 MARK_EMPTY = "–"   # tespit yok
 MARK_ERR = "!"     # hata
 MARK_SKIP = "»"    # atlandı (zaten etiketli)
+
+
+# Metinle tespit edebilen ağırlıkların adında geçen ekler
+ACIK_SOZLUK_EKLERI = ("-world", "-worldv2", "yoloe")
+
+# ultralytics yoksa (arayüz onsuz da açılıyor) kullanılacak yedek liste
+YEDEK_ACIK_SOZLUK = ["yolov8s-worldv2.pt", "yolov8m-worldv2.pt",
+                     "yolov8l-worldv2.pt", "yoloe-11s-seg.pt", "yoloe-11m-seg.pt"]
+
+
+def acik_sozluk_modelleri() -> list:
+    """Metinle tespit eden ağırlıkların adları — ultralytics'in kendi listesinden.
+
+    Sıra rastgele değil: önce `yolov8s-worldv2.pt` geliyor, çünkü varsayılanın
+    küçük, hızlı ve gerçekten metin istemiyle çalışan bir model olması gerekiyor.
+    `-pf` ("prompt-free") varyantları sona atılıyor: onlar sabit bir sözlükle
+    çalışır ve yazdığın metni yok sayar — listede dururlar ama varsayılan
+    olmamalılar, yoksa "metin yazdım ama alakasız kutular çıktı" oluyor.
+    """
+    try:
+        from ultralytics.utils.downloads import GITHUB_ASSETS_NAMES
+        adlar = sorted(a for a in GITHUB_ASSETS_NAMES
+                       if a.endswith(".pt")
+                       and any(ek in a for ek in ACIK_SOZLUK_EKLERI))
+    except Exception:
+        adlar = []
+    if not adlar:
+        return list(YEDEK_ACIK_SOZLUK)
+
+    def sira(ad):
+        return (0 if ad == "yolov8s-worldv2.pt" else 2 if "-pf" in ad else 1, ad)
+
+    return sorted(adlar, key=sira)
 
 
 def out_stem(path: str, img_dir: str) -> str:
@@ -97,6 +131,33 @@ class LabelWorker(QThread):
             for i in sorted(names):
                 f.write(f"  {i}: {names[i]}\n")
 
+    def _acik_sozluk_yukle(self, yol: str, istem: list):
+        """Metinle tespit eden (açık sözlüklü) modeli kur.
+
+        Neden ayrı bir yığın değil: aynı işi Grounding DINO da yapıyor ama
+        transformers ve ayrı bir çeviri modeli getiriyordu. ultralytics zaten
+        zorunlu bağımlılığımız ve içinde YOLO-World ile YOLOE var.
+
+        Bedava değil ama: sınıf adlarını gömmek için CLIP gerekiyor ve
+        ultralytics onu ilk kullanımda kendisi kuruyor (~340 MB indirme).
+        Yine de Grounding DINO yolundan hafif. Sınıf listesi modele metin
+        olarak verildiği için hiç eğitilmemiş bir nesne de aranabiliyor.
+        """
+        ad = os.path.basename(yol).lower()
+        if "yoloe" in ad:
+            from ultralytics import YOLOE
+            model = YOLOE(yol)
+            try:
+                model.set_classes(istem, model.get_text_pe(istem))
+            except Exception:
+                model.set_classes(istem)
+        else:
+            from ultralytics import YOLOWorld
+            model = YOLOWorld(yol)
+            model.set_classes(istem)
+        self.log.emit("Metinle arama açık — istem: " + ", ".join(istem))
+        return model, {i: ad_ for i, ad_ in enumerate(istem)}
+
     def run(self):
         cfg = self.cfg
         try:
@@ -106,10 +167,15 @@ class LabelWorker(QThread):
             self.failed.emit(f"ultralytics/opencv içe aktarılamadı:\n{e}")
             return
 
+        istem = [s.strip() for s in (cfg.get("prompt") or "").split(",") if s.strip()]
+
         try:
             self.log.emit(f"Model yükleniyor: {cfg['model_path']}")
-            model = YOLO(cfg["model_path"])
-            names = dict(model.names)
+            if istem:
+                model, names = self._acik_sozluk_yukle(cfg["model_path"], istem)
+            else:
+                model = YOLO(cfg["model_path"])
+                names = dict(model.names)
             self.model_ready.emit(names)
             self.log.emit(f"Model hazır — {len(names)} sınıf: "
                           + ", ".join(names[i] for i in sorted(names)))
@@ -126,6 +192,12 @@ class LabelWorker(QThread):
         pred_dir = os.path.join(cfg["out_dir"], "predictions")
         if cfg["save_preview_files"]:
             os.makedirs(pred_dir, exist_ok=True)
+
+        roi_poligonlari = cfg.get("roi") or []
+        roi_elenen = 0
+        if roi_poligonlari:
+            self.log.emit("ROI süzgeci açık — " + roi_modulu.ozet(roi_poligonlari)
+                          + " (merkezi dışarıda kalan tespitler yazılmaz)")
 
         stats = {"islenen": 0, "tespitli": 0, "bos": 0, "atlanan": 0, "hatali": 0,
                  "tespit_toplam": 0, "sinif": {}}
@@ -171,6 +243,18 @@ class LabelWorker(QThread):
                     xywhn = boxes.xywhn.cpu().numpy()
                     clss = boxes.cls.cpu().numpy().astype(int)
                     confs = boxes.conf.cpu().numpy()
+                    # ROI süzgeci: ölçüt kutunun merkezi. xywhn zaten normalize
+                    # olduğu için görüntü boyutuna bakmaya gerek yok.
+                    if roi_poligonlari:
+                        secim = [i for i, (x, y, _w, _h) in enumerate(xywhn)
+                                 if roi_modulu.kutu_gecerli_normal(
+                                     roi_poligonlari, float(x), float(y))]
+                        if len(secim) != len(xywhn):
+                            roi_elenen += len(xywhn) - len(secim)
+                        xywhn = xywhn[secim]
+                        clss = clss[secim]
+                        confs = confs[secim]
+                        n = len(secim)
                     for (x, y, w, h), c, cf in zip(xywhn, clss, confs):
                         if cfg["save_conf"]:
                             lines.append(f"{c} {x:.6f} {y:.6f} {w:.6f} {h:.6f} {cf:.4f}")
@@ -228,6 +312,9 @@ class LabelWorker(QThread):
                 self.log.emit(f"HATA — data.yaml yazılamadı: {e}")
 
         stats["iptal"] = self._cancel
+        stats["roi_elenen"] = roi_elenen
+        if roi_elenen:
+            self.log.emit(f"ROI dışında kaldığı için {roi_elenen} tespit yazılmadı.")
         self.summary.emit(stats)
 
 
@@ -358,6 +445,15 @@ class MainWindow(QMainWindow):
         h.addWidget(b)
         return h
 
+    def _row_label(self, metin: str, widget) -> QHBoxLayout:
+        h = QHBoxLayout()
+        h.setSpacing(6)
+        lbl = QLabel(metin)
+        lbl.setMinimumWidth(58)
+        h.addWidget(lbl)
+        h.addWidget(widget, 1)
+        return h
+
     def _build_right_panel(self) -> QWidget:
         w = QWidget()
         w.setMinimumWidth(320)
@@ -379,6 +475,55 @@ class MainWindow(QMainWindow):
         gm.addWidget(self.model_info_lbl)
         v.addWidget(grp_m)
 
+        # ── Metinle arama (sıfır-atış)
+        grp_z = QGroupBox("Metinle Ara (sıfır-atış)")
+        gz = QVBoxLayout(grp_z)
+        gz.setSpacing(6)
+        self.zs_chk = QCheckBox("Sınıfları modelden değil, yazdığım metinden al")
+        self.zs_chk.setToolTip(
+            "Eğitilmiş bir modelin yokken kullan: aradığın nesneleri yazarsın,\n"
+            "açık sözlüklü model (YOLO-World / YOLOE) onları kutular.\n"
+            "İlk kullanımda ağırlık ve metin gömme modeli inilir (~340 MB) ve\n"
+            "ultralytics 'clip' paketini kendisi kurar — internet gerekir.\n"
+            "Sonuç taslaktır — Labelapp'te gözden geçir.")
+        self.zs_chk.toggled.connect(self._zs_degisti)
+        gz.addWidget(self.zs_chk)
+
+        self.zs_edit = QLineEdit()
+        self.zs_edit.setPlaceholderText("aranacak nesneler, virgülle: forklift, baret, palet")
+        self.zs_edit.setEnabled(False)
+        gz.addWidget(self.zs_edit)
+
+        self.zs_model_combo = QComboBox()
+        # Elinde açık sözlüklü ağırlık olmayabilir; ultralytics bu adları ilk
+        # çalıştırmada kendisi indiriyor, dosya seçmeye gerek kalmıyor.
+        # Liste elle yazılmıyor: ultralytics'in indirilebilir ağırlıkları
+        # arasından metinle tespit edenler süzülüyor, böylece yeni bir model
+        # ailesi çıktığında burası kendiliğinden güncelleniyor.
+        self.zs_model_combo.setEditable(True)
+        self.zs_model_combo.setInsertPolicy(QComboBox.NoInsert)
+        for ad in acik_sozluk_modelleri():
+            etiket = ad + ("   (istemsiz — yazdığın metni yok sayar)"
+                           if "-pf" in ad else "")
+            self.zs_model_combo.addItem(etiket, ad)
+        self.zs_model_combo.addItem("Yukarıdaki model kutusundaki dosyayı kullan", "")
+        self.zs_model_combo.setMaxVisibleItems(20)
+        self.zs_model_combo.setEnabled(False)
+        self.zs_model_combo.setToolTip(
+            "Metinle tespit edebilen ağırlıklar (YOLO-World / YOLOE).\n"
+            "Listede olmayan bir ad ya da dosya yolu da yazabilirsin.")
+        gz.addLayout(self._row_label("Ağırlık", self.zs_model_combo))
+
+        self.zs_bilgi = QLabel(
+            "Eğitilmiş modelin yokken kullan. Sonuç taslaktır: düşük eşikle "
+            "çalıştırıp Labelapp'te gözden geçirmek en hızlı yol.\n"
+            "İlk kullanımda internet gerekir: ağırlık ve metin gömme modeli "
+            "(~340 MB) inilir, ultralytics ayrıca 'clip' paketini kendisi kurar.")
+        self.zs_bilgi.setWordWrap(True)
+        self.zs_bilgi.setStyleSheet("color:#6b7686; font-size:11px;")
+        gz.addWidget(self.zs_bilgi)
+        v.addWidget(grp_z)
+
         # ── Girdi
         grp_i = QGroupBox("Fotoğraf Klasörü")
         gi = QVBoxLayout(grp_i)
@@ -386,9 +531,36 @@ class MainWindow(QMainWindow):
         self.img_edit = QLineEdit()
         self.img_edit.setPlaceholderText("fotoğrafların olduğu klasör")
         gi.addLayout(self._dir_row(self.img_edit, self._pick_img_dir))
+        self.canli_lbl = QLabel(
+            "Canlı kaynaktan etiketlemek için Kare Alıcı'da kareleri yakalayıp "
+            "buraya o klasörü ver — böylece etiketlediğin kareler diskte kalır.")
+        self.canli_lbl.setStyleSheet("color:#6b7686; font-size:11px;")
+        self.canli_lbl.setWordWrap(True)
+        gi.addWidget(self.canli_lbl)
+
         self.recursive_chk = QCheckBox("Alt klasörleri de tara")
         self.recursive_chk.toggled.connect(self._rescan_images)
         gi.addWidget(self.recursive_chk)
+
+        roi_satir = QHBoxLayout()
+        roi_satir.setSpacing(6)
+        self.roi_chk = QCheckBox("Yalnızca ilgi alanı (ROI) içi")
+        self.roi_chk.setToolTip(
+            "Açıkken merkezi ROI dışında kalan tespitler yazılmaz.\n"
+            "Kameranın gördüğü alanın çoğu zaman yarısı alakasızdır (komşu hat,\n"
+            "koridor); oradaki tespitler veri setine gürültü olarak girer.")
+        self.roi_chk.toggled.connect(self._roi_ozeti_tazele)
+        roi_satir.addWidget(self.roi_chk)
+        self.roi_btn = QPushButton("Çiz…")
+        self.roi_btn.setFixedWidth(70)
+        self.roi_btn.clicked.connect(self._roi_ciz)
+        roi_satir.addWidget(self.roi_btn)
+        gi.addLayout(roi_satir)
+
+        self.roi_lbl = QLabel()
+        self.roi_lbl.setStyleSheet("color:#6b7686; font-size:11px;")
+        self.roi_lbl.setWordWrap(True)
+        gi.addWidget(self.roi_lbl)
         v.addWidget(grp_i)
 
         # ── Çıktı
@@ -539,6 +711,65 @@ class MainWindow(QMainWindow):
     def _log(self, text: str):
         self.log_box.append(text)
 
+    def _roi_poligonlari(self) -> list:
+        """Seçili klasörün ROI'si (kutu kapalıysa boş = kısıt yok)."""
+        if not (self.roi_chk.isChecked() and self._img_dir):
+            return []
+        return roi_modulu.yukle(self._img_dir)
+
+    def _roi_ozeti_tazele(self, *_):
+        if not self._img_dir:
+            self.roi_lbl.setText("Önce fotoğraf klasörü seç.")
+            return
+        poligonlar = roi_modulu.yukle(self._img_dir)
+        ozet = roi_modulu.ozet(poligonlar)
+        if self.roi_chk.isChecked() and not poligonlar:
+            ozet += "  —  çizilmemiş, süzgeç uygulanmayacak"
+        self.roi_lbl.setText(ozet)
+
+    def _roi_ciz(self):
+        """ROI'yi ilk görselin üstünde çiz."""
+        if not self._img_dir or not self._images:
+            QMessageBox.information(
+                self, "Görsel yok",
+                "Önce fotoğraf klasörünü seç — ROI bir örnek karenin üstüne çizilir.")
+            return
+        kare = QPixmap(self._images[0])
+        if kare.isNull():
+            QMessageBox.warning(self, "Kare açılamadı",
+                                f"Örnek kare okunamadı:\n{self._images[0]}")
+            return
+        from .roi_dialog import RoiDialog
+        d = RoiDialog(self._img_dir, kare, self)
+        if d.exec_():
+            self._roi_ozeti_tazele()
+            self._log("ROI kaydedildi: " + roi_modulu.ozet(d.poligonlar()))
+            if d.poligonlar() and not self.roi_chk.isChecked():
+                self.roi_chk.setChecked(True)
+
+    def _zs_agirlik(self) -> str:
+        """Seçilen ya da elle yazılan açık sözlük ağırlığı ('' = dosyayı kullan)."""
+        idx = self.zs_model_combo.currentIndex()
+        if idx >= 0 and self.zs_model_combo.itemText(idx) == self.zs_model_combo.currentText():
+            return self.zs_model_combo.itemData(idx) or ""
+        metin = self.zs_model_combo.currentText().strip()
+        if metin and not os.path.splitext(metin)[1]:
+            metin += ".pt"
+        return metin
+
+    def _zs_degisti(self, acik: bool):
+        """Metinle arama açıkken modelin kendi sınıf listesi anlamını yitirir."""
+        self.zs_edit.setEnabled(acik)
+        self.zs_model_combo.setEnabled(acik)
+        if hasattr(self, "class_list"):
+            self.class_list.setEnabled(not acik)
+        if acik:
+            self.zs_edit.setFocus()
+            self.model_info_lbl.setText(
+                "Sınıflar metinden alınacak — modelin kendi listesi kullanılmıyor.")
+        else:
+            self._set_names(self._names)
+
     def _pick_model(self):
         p, _ = QFileDialog.getOpenFileName(
             self, "YOLO modeli seç", self._model_path or "",
@@ -609,6 +840,7 @@ class MainWindow(QMainWindow):
         self._rescan_images()
 
     def _rescan_images(self):
+        # ROI dosyası klasörün yanında durur; klasör değişince özet de değişir
         if not self._img_dir:
             return
         self._images = list_images(self._img_dir, self.recursive_chk.isChecked())
@@ -618,6 +850,7 @@ class MainWindow(QMainWindow):
             it.setData(Qt.UserRole, p)
             it.setToolTip(p)
             self.file_list.addItem(it)
+        self._roi_ozeti_tazele()
         self.file_count_lbl.setText(f"{len(self._images)} görsel")
         self.status.showMessage(f"{len(self._images)} görsel bulundu: {self._img_dir}")
         if self._images:
@@ -673,9 +906,19 @@ class MainWindow(QMainWindow):
     def _start(self):
         if self._worker:
             return
-        if not self._model_path or not os.path.exists(self._model_path):
+        # Sıfır-atışta seçilen ağırlık diskte olmayabilir: ultralytics onu
+        # adından indiriyor. O yüzden dosya varlığı yalnızca normal kipte aranır.
+        zs_agirlik = self._zs_agirlik() if self.zs_chk.isChecked() else ""
+        if not zs_agirlik and (not self._model_path
+                               or not os.path.exists(self._model_path)):
             QMessageBox.warning(self, "Model yok", "Geçerli bir model (.pt) seç.")
             return
+        if self.zs_chk.isChecked() and not self.zs_edit.text().strip():
+            QMessageBox.warning(self, "Metin boş",
+                                "Metinle arama açık ama ne aranacağı yazılmamış.\n"
+                                "Virgülle ayırarak yaz: forklift, baret, palet")
+            return
+
         if not self._img_dir or not self._images:
             QMessageBox.warning(self, "Fotoğraf yok",
                                 "Fotoğraf klasörü seç (klasörde desteklenen görsel bulunamadı).")
@@ -700,7 +943,7 @@ class MainWindow(QMainWindow):
             return
 
         cfg = {
-            "model_path": self._model_path,
+            "model_path": zs_agirlik or self._model_path,
             "images": list(self._images),
             "img_dir": self._img_dir,
             "out_dir": self._out_dir,
@@ -717,11 +960,15 @@ class MainWindow(QMainWindow):
             "skip_existing": self.skip_chk.isChecked(),
             "save_conf": self.conf_col_chk.isChecked(),
             "show_preview": self.show_preview_chk.isChecked(),
+            "prompt": self.zs_edit.text().strip() if self.zs_chk.isChecked() else "",
+            "roi": self._roi_poligonlari(),
         }
 
         self.log_box.clear()
         self._log(f"{len(self._images)} görsel işlenecek → {self._out_dir}")
-        if cfg["classes"]:
+        if cfg["prompt"]:
+            self._log("Metinle arama: " + cfg["prompt"])
+        elif cfg["classes"]:
             self._log("Sınıf filtresi: " + ", ".join(
                 str(self._names.get(c, c)) for c in cfg["classes"]))
 

@@ -193,7 +193,35 @@ git checkout main        # güncele dön
 | [`v4.0.0`](../../releases/tag/v4.0.0) | **Döngü uygulamanın içinde kapandı:** ◈ Eğitim (dokuzuncu araç) + ⇉ veri seti birleştirme/sınıf eşleme + sızıntılı bölme hatasının düzeltilmesi + platforma göre kurulum (macOS `.app`) |
 | [`v4.1.0`](../../releases/tag/v4.1.0) | **☀/☾ Açık ve koyu tema** + platform desteğinin macOS/Linux/Windows'ta eşitlenmesi (GStreamer düzeltmesi ARM Linux'ta da çalışıyor) |
 | [`v4.2.0`](../../releases/tag/v4.2.0) | **Yol hafızası** (33 diyalog son kullanılan klasörü hatırlıyor) + kurulum betikleri artık ortamı da kuruyor (`kur.sh ortam`, conda öncelikli) |
-| [`v4.3.0`](../../releases/tag/v4.3.0) | **⇩ COCO / Pascal VOC içe aktarma** + **⇥ takip destekli etiketleme** (kutuyu sonraki karelere taşıma) — **güncel sürüm** |
+| [`v4.3.0`](../../releases/tag/v4.3.0) | **⇩ COCO / Pascal VOC içe aktarma** + **⇥ takip destekli etiketleme** (kutuyu sonraki karelere taşıma) |
+| [`v5.0.0`](../../releases/tag/v5.0.0) | **Çekirdek/adaptör mimarisi**, **canlı kamera girişi**, **ilgi alanı (ROI)**, **MLflow**, **dayanıklılık koşusu**, yeniden yazılmış **Labelapp editörü** — **güncel sürüm** |
+
+### 5.0.0'da neler değişti
+
+**Mimari.** Boxify dışarıya iki yerden bağlanıyor: kareyi nereden aldığı ve çıkarımı neyin
+yaptığı. İkisi de port oldu (`boxify/cekirdek/`), somut karşılıkları adaptör (`boxify/adaptorler/`).
+Çekirdek PyQt5, ultralytics, tensorrt ve cv2 import etmiyor — bu kural yorumda değil testte duruyor.
+
+**Canlı kamera girişi.** Kare Alıcı artık dosyadan başka kaynak da okuyor: `kamera:0` (USB),
+`rtsp://…` ve `hik:192.168.1.64` (Hikrobot MVS SDK). Kaynak türü adresten anlaşılıyor.
+
+**İlgi alanı (ROI).** Poligon çizilip Oto Label, Hata Analizi ve Model Karşılaştır'da
+uygulanıyor. Hata Analizi'nde referans kutular da eleniyor — yalnızca tahminleri elemek,
+ROI dışındaki her nesneyi "kaçırıldı" saymak olurdu.
+
+**MLflow.** Ölçüm üreten dört araçta da isteğe bağlı kayıt. Kutu kapalıyken ultralytics'in
+varsayılan açık gelen kaydı da kapatılıyor.
+
+**Dayanıklılık koşusu.** "Ne kadar hızlı" değil "uzun koşuda ayakta mı": bellek, takas ve
+sıcaklık örneklenip GEÇTİ/UYARI/KALDI değerlendirmesi çıkıyor. Hız ölçümüne p99, sivrilme
+ve sürüklenme eklendi.
+
+**Labelapp editörü.** Yakınlaştırma/kaydırma, kılavuz çizgileri, geri al/yinele, kutunun
+üstünde sınıf paneli, küçük resim ızgarası, araç rayı, 1-9 kısayolları, görseli silme.
+İndirilen YOLO veri setleri (`images/<bölüm>` ↔ `labels/<bölüm>`) artık açılabiliyor.
+
+**Model seçimi.** 165 ağırlık, iki kademeli (aile → sürüm) seçici; liste ultralytics'in kendi
+listesinden geliyor ve alan yazılabilir.
 
 ### 4.3.0'da neler değişti
 
@@ -338,11 +366,36 @@ birbirinin kopyasıdır ve veri setini şişirir.
 
 ![Kare Alıcı](gorseller/kare_alici.png)
 
+**Canlı kaynaktan yakala** — kare yalnızca dosyadan gelmek zorunda değil. Sağ paneldeki adres
+alanına `kamera:0` (USB), `rtsp://kullanici:sifre@ip/stream` ya da `hik:192.168.1.64` yazıp
+doğrudan veri seti üretebilirsin: verilen aralıkla verilen sayıda kare yakalanır. Canlı kaynakta
+aralık **zamana** göre işler (kamera fps'i değişince sıklık kaymasın diye), dosyada kare
+sayısına göre.
+
 ### ⚡ Oto Label — mevcut modelle kareleri ön etiketle
 
 Eldeki YOLO modeliyle kareleri tarar, YOLO txt etiketleri üretir. Düşük güven eşiğiyle (örn. 0.25)
 çalıştırıp elle düzeltmek, sıfırdan etiketlemekten çok daha hızlıdır: fazladan kutuyu silmek,
 kaçırılmış nesneyi çizmekten kolaydır. İlk turda hazır bir COCO modeli bile işe yarar.
+
+**Metinle Ara (sıfır-atış)** — hiç modelin yokken de ön etiketleme yapılabilir: aradığın nesneleri
+virgülle yazarsın (`forklift, baret, palet`), açık sözlüklü model onları kutular. Ağırlık listeden
+seçilir; kurulu değilse ilk çalıştırmada inilir.
+
+Bunun için `requirements.txt`'ye bir şey **eklemek** gerekmiyor: YOLO-World ve YOLOE zaten
+`ultralytics`'in içinde. Ama bedava da değil — sınıf adlarını gömmek için CLIP kullanılıyor ve
+ultralytics ilk çalıştırmada `clip` paketini **kendiliğinden kurar**, ayrıca ağırlık + metin
+gömme modeli olarak ~340 MB iner. Yani ilk kullanımda internet gerekir ve ortamına birkaç paket
+eklenir. Yine de Grounding DINO yolundan hafiftir: `transformers`, `sentencepiece` ve ayrı bir
+çeviri modeli gelmez.
+
+Çıkan etiketler taslaktır, Labelapp'te gözden geçirilmelidir.
+
+**İlgi alanı (ROI)** — kameranın gördüğü alanın çoğu zaman yarısı alakasızdır: komşu hat, koridor,
+tavan. "Çiz…" ile örnek karenin üstüne poligon çizilir; merkezi ROI dışında kalan tespitler
+yazılmaz. Poligon, dikdörtgen değil — hat çoğu zaman çapraz geçer ve dikdörtgen ya komşu hattı
+içeri alır ya kendi hattının ucunu keser. Koordinatlar 0-1 normalize saklanır, yani ROI 1080p
+önizlemede çizilip 4K kayıtta kullanılabilir. Dosya (`roi.json`) veri setinin yanında durur.
 
 ![Oto Label](gorseller/oto_label.png)
 
@@ -351,6 +404,20 @@ kaçırılmış nesneyi çizmekten kolaydır. İlk turda hazır bir COCO modeli 
 Kutu çizme, taşıma ve sınıf atama arayüzü. Oto Label'ın ürettiklerini gözden geçirmek ve eksikleri
 tamamlamak için. Klavye kısayollarıyla hızlı gezinme (A/D ile önceki/sonraki kare), sınıf yönetimi
 ve uygulama içinden eğitim başlatma da burada.
+
+- **Yakınlaştırma ve kaydırma** — fare tekerleği imlecin altındaki pikseli sabit tutarak
+  yakınlaştırır, sağ tuşla sürükleyerek kaydırılır, `Ctrl+0` sığdırır. 1080p bir karede 30
+  piksellik bir nesneye sıkı kutu çizmek bunsuz mümkün değildi.
+- **Kılavuz çizgileri** — imleci takip eden hizalama çizgileri; kutunun uzak kenarının nereye
+  denk geldiği tahmine kalmıyor.
+- **Geri al / yinele** — `Ctrl+Z` / `Ctrl+Y`, kare başına 100 adım.
+- **Sınıf paneli kutunun üstünde** — kutu çizince sınıf oracıkta yazılır; olmayan bir ad
+  yazılırsa sınıf o anda yaratılır. Son kullanılan sınıf yapışkandır, sonraki kutular onunla
+  gelir. `1`–`9` tuşları sınıfı seçer, bir kutu seçiliyse onun sınıfını değiştirir.
+- **Küçük resim ızgarası** — kareler arka planda üretilen küçük resimlerle listelenir;
+  etiketlisi yeşil, etiketsizi soluk. Düz liste görünümüne geçilebilir.
+- **Araç rayı** — geri al, yakınlaştırma ve Kutuları Taşı sağdaki dikey rayda; yıkıcı olan
+  **Görseli Sil** en altta, ayrı durur.
 
 ![Labelapp](gorseller/labelapp.png)
 
@@ -431,9 +498,21 @@ Döngünün kapandığı yer: Veri Denetçi'nin ürettiği `data.yaml` burada e�
 Hata Analizi ve Model Karşılaştır'a girer, oradan gelen bilgiyle veri büyür ve **aynı modelin
 üstüne** yeniden eğitilir.
 
-- **Kendi modelinden devam** — başlangıç ağırlığı hazır bir isim (`yolo11n`…) ya da senin
-  herhangi bir `.pt`'n olabilir. İkinci turdan itibaren doğrusu, önceki turun `best.pt`'sini
-  seçmektir; sıfırdan eğitmek öğrenileni atmaktır.
+- **Kendi modelinden devam** — başlangıç ağırlığı hazır bir isim ya da senin herhangi bir
+  `.pt`'n olabilir. İkinci turdan itibaren doğrusu, önceki turun `best.pt`'sini seçmektir;
+  sıfırdan eğitmek öğrenileni atmaktır.
+- **Ağırlık seçimi iki kademeli ve kısıtsız** — önce **aile** (yolo11, yolo12, yolo26, yolov8,
+  yolov10, yolov9, yolov5, yolov3, RT-DETR, YOLO-NAS, YOLOE), sonra o ailenin **sürümü**.
+  165 ağırlığı tek bir açılır listeye sığdırmak kaydırarak aramak demekti.
+
+  Liste elle yazılmıyor: **ultralytics'in kendi indirilebilir ağırlık listesinden** gelir, yani
+  yeni bir aile çıktığında kendiliğinden güncellenir. Her ailede sade model başta, özel türevler
+  ve tespit dışı görevler (poz, segmentasyon, sınıflandırma, yönlü kutu) parantezle işaretlenip
+  sonra gelir. Sürüm alanı **yazılabilir**: listede olmayan bir ad ya da doğrudan bir dosya yolu
+  da verilebilir.
+
+  Aynı seçici Labelapp'in eğitim penceresinde de kullanılır — orada ayrı bir on isimlik liste
+  vardı ve kullanıcı aynı uygulamada iki farklı model listesi görüyordu.
 - **Cihaz seçimi** — Apple donanımında MPS, NVIDIA'da CUDA, ya da CPU.
 - **Erken durdurma, katman dondurma, resume, ara kayıt, optimizer, lr, tohum.**
 - **Canlı eğri** — kayıp (mavi, düz) ve mAP50-95 (kehribar, kesikli) epoch epoch çizilir; son
@@ -442,6 +521,27 @@ Hata Analizi ve Model Karşılaştır'a girer, oradan gelen bilgiyle veri büyü
   taranır. Ortak sahne bulunursa örnekleriyle söylenir ve eğitim sen onaylamadan başlamaz; bu
   denetim olmadan şişik bir mAP'ye bakıp modeli iyi sanmak çok kolaydır.
 - **Durdurma** — sıradaki epoch sınırında durur, o ana kadarki en iyi ağırlık diskte kalır.
+- **Geçmiş sekmesi** — çıktı klasöründeki bütün turlar tabloda listelenir (tarih, epoch, en iyi
+  mAP50-95, başlangıç ağırlığı); birden fazla tur seçilince mAP eğrileri üst üste çizilir. Tek
+  turun eğrisi "eğitim iyi gitti mi" sorusunu cevaplıyor, asıl karar sorusu ise "bu tur bir
+  öncekinden iyi mi" — o da ancak turlar aynı eksene konunca görülüyor. Yanında **hiperparametre
+  kıyası** var: seçili turların `args.yaml`'ları yan yana dizilir ve **turlar arasında değişen
+  ayarlar işaretlenir**. Skorun neden değiştiğini cevaplayan şey eğrinin kendisi değil, ayarların
+  ne değiştiğidir. Kaynağı ultralytics'in her turda yazdığı `results.csv` ve `args.yaml`'dır;
+  ek paket gerektirmez.
+- **MLflow'a da kaydet** (isteğe bağlı) — açıkken parametreler, epoch metrikleri ve ağırlıklar
+  çıktı klasörünün altındaki `mlflow/` dizinine yazılır; sunucu gerekmez, incelemek için
+  `mlflow ui --backend-store-uri sqlite:///<çıktı>/mlflow/mlflow.db` yeter. Kutu **kapalıyken
+  kayıt da kapatılır**: ultralytics'in MLflow geri çağrımı varsayılan olarak açıktır ve mlflow
+  kurulu bir makinede kimse istemeden kayıt tutmaya başlar.
+
+  Aynı kutu **Model Karşılaştır, Hata Analizi ve Model Export**'ta da var — ölçüm üreten her
+  araçta. Model Karşılaştır her modeli, Model Export her ölçülen dosyayı ayrı tur olarak yazar
+  (MLflow'un kıyas ekranı turları yan yana koyduğu için hepsini tek tura tıkmak o ekranı işe
+  yaramaz yapardı); Hata Analizi tek bir skoru değil kaçırma/uydurma/karışıklık dökümünü kaydeder.
+
+  Depo SQLite'tır (`mlflow/mlflow.db`): dosya tabanlı depo MLflow 3.x'te bakım moduna alındı ve
+  `file:` adresiyle kayıt açmak istisna fırlatıyor.
 
 Eğitim ayrı bir süreçte değil, ayrı bir **iş parçacığında** koşar ve ilerleme stdout ayrıştırarak
 değil ultralytics'in `add_callback`'iyle alınır.
@@ -484,6 +584,23 @@ orijinalden ne kadar saptığını) raporlar. Ölçümü hedef donanımda yapmak
 
 ![Model Export](gorseller/model_export.png)
 
+**Dayanıklılık koşusu** — "ne kadar hızlı" ile "uzun koşuda ayakta mı" farklı sorulardır ve
+sahaya giden bir sistemde ikincisi belirleyicidir. Süre alanına 0'dan büyük bir değer verirsen
+model o kadar dakika aralıksız çalışır; bellek, takas ve (okunabiliyorsa) sıcaklık beş saniyede
+bir örneklenir. Sonunda eksen eksen bir **GEÇTİ / UYARI / KALDI** değerlendirmesi çıkar: bellek
+sızıntısı, takas artışı, sıcaklık, hız sürüklenmesi ve arada gelen çıkarım hataları. Örnekler
+ayrıca CSV olarak yazılır.
+
+Bir kural: **okunamayan eksen GEÇTİ değil UYARI sayılır.** macOS ve Windows'ta sıcaklık sensörü
+ek yazılım olmadan okunamaz; ölçemediğini geçmiş saymak raporu olduğundan güvenli gösterirdi.
+
+**Kararlılık ölçümü** — ortalama ve p95, ısınmış ve sabit bir makinede yeterli. Gerçek dağıtım
+donanımında (özellikle Jetson gibi pasif soğutmalı kartlarda) sorun ortalamada değil kuyruğunda
+çıkar. Rapor bu yüzden ayrıca **p99, en kötü kare, standart sapma, sivrilme sayısı** (medyanın iki
+katını aşan kare) ve **sürüklenme** verir: koşu eşit pencerelere bölünüp her birinin p50'si
+çıkarılır, son pencere ilkinden %15'ten fazla yüksekse rapor ısınma/kısıtlama uyarısı basar.
+Sahadaki sürekli hız ilk pencereninki değil, son pencereninkidir.
+
 ### ✦ İpuçları sayfası
 
 Genel akışın nasıl işlediği ve her aracın püf noktaları uygulamanın içinde de anlatılır
@@ -505,6 +622,10 @@ dosyasında dille birlikte saklanır ve dokuz aracın tamamına işler:
 
 ![Koyu tema](gorseller/anasayfa_koyu.png)
 
+Koyu temanın vurgusu mordur — Roboflow benzeri etiketleme araçlarının görsel diline
+yaklaşmak için seçildi. Açık tema bilinçli olarak mavi ve düşük parlamalı kalır; gündüz
+uzun süre çalışan kullanıcı için.
+
 Koyu tema, araç kodlarının hiçbirine dokunmadan çalışıyor. Araçlar kendi ayrıntı stillerini
 `setStyleSheet` ile ve renkleri doğrudan yazarak veriyor — 119 çağrı, ~15 ayrı ton. Bunları tek
 tek düzenlemek hem riskliydi hem de sonradan yazılacak her araçta aynı işi gerektirirdi. Onun
@@ -517,8 +638,9 @@ metnindeki açık palet renkleri koyu karşılıklarıyla değiştiriliyor.
   Renk körlüğü gözetilerek seçildiler ve koyu tuval üzerinde okunuyorlar; temaya göre
   değiştirmek o dengeyi bozardı. Zaten yalnızca `QColor`/`QPainter` ile kullanılıyorlar,
   dönüşüm ise sadece stil metinlerine bakıyor.
-- **Görüntü ve video tuvalleri** her iki temada da koyu kalır — kutu renkleri koyu zeminde
-  daha iyi seçilir.
+- **Görüntü ve video tuvalleri** kendi boyamasını `QPainter` ile yaptığı için stil yamasının
+  dışında kalır; zemin rengini `tema.renk()`ten isteyerek temayı yine de izlerler. Üstlerine
+  çizilen kutu ve sınıf renkleri iki temada da aynı kalır.
 
 Kendi boyamasını yapan widget'lar (ör. Eğitim'deki kayıp/mAP eğrisi) rengi `tema.renk()`
 üzerinden ister; onlar için yamalama yeterli olmaz.
@@ -543,6 +665,66 @@ eşitliği, dört dil/tema kombinasyonu, yol hafızası. Hangi testin neyi korud
 
 ---
 
+## Mimari — çekirdek ve adaptörler
+
+Boxify dışarıya iki yerden bağlanıyor: **kareyi nereden aldığı** ve **çıkarımı neyin yaptığı**.
+Bu iki yer port olarak tanımlı; geri kalan her şey (etiket dosyaları, veri seti düzeni, raporlar)
+zaten kendi içinde.
+
+```text
+boxify/cekirdek/     portlar + veri tipleri — PyQt5, ultralytics, tensorrt, cv2 İMPORT EDİLMEZ
+   portlar.py           KareKaynagi · CikarimMotoru
+   tipler.py            Kare · Tespit · KaynakBilgi
+
+boxify/adaptorler/   portların somut karşılıkları
+   kaynak.py            klasör · video · USB kamera · RTSP · Hikvision (MVS SDK)
+   cikarim.py           ultralytics · ham TensorRT
+```
+
+Kural yorumda değil testte duruyor: `testler/test_mimari.py` çekirdeğin import satırlarını
+tarıyor ve arayüz/donanım paketi görürse düşüyor. Ayrıca çekirdeği ayrı bir süreçte tek başına
+import edip çalıştığını doğruluyor.
+
+Pratikte kazandırdığı: **kaynak adresi tek bir metin alanı.** Kullanıcı `kamera:0`, `rtsp://…`
+ya da `hik:192.168.1.64` yazıyor; hangi adaptörün açılacağına adres karar veriyor. Yeni bir
+kamera türü eklemek ne arayüzü ne araçları değiştiriyor — `kaynak.py`'ye bir sınıf ekleniyor.
+
+Aynı biçimde `.engine` bir model verildiğinde ve donanım uygunsa **ham TensorRT** yolu
+kullanılıyor (önceden ayrılmış GPU tamponları, tek stream — gecikme dalgalanmasını düşürmenin
+yolu bu); uygun değilse sessizce ultralytics motoruna düşülüyor ve kullanıcı bir şey kaybetmiyor.
+
+### Hikrobot kameralar ve MVS SDK
+
+İki ayrı şey karıştırılmasın:
+
+| Ürün | Nasıl bağlanılır |
+|---|---|
+| **Hikvision** güvenlik/IP kameraları | `rtsp://kullanici:sifre@ip/Streaming/Channels/101` — SDK gerekmez |
+| **Hikrobot** endüstriyel (makine görüşü) kameralar | `hik:192.168.1.64` — **MVS SDK** gerekir |
+
+**MVS SDK depoda tutulamaz**: pip paketi değil, Hikrobot'un kurulum paketidir. Boxify onu
+kurulu olduğu yerde arar:
+
+| Sistem | Aranan yol |
+|---|---|
+| Windows | `C:\Program Files (x86)\MVS\Development\Samples\Python\MvImport` |
+| Linux / Jetson | `/opt/MVS/Samples/<mimari>/Python/MvImport` (Jetson'da `aarch64`) |
+
+Başka bir yere kurduysan `MVCAM_SDK_PATH` ortam değişkenini ayarla. SDK bulunamazsa Boxify
+hangi yollara baktığını tek tek söyler ve güvenlik kamerası için MVS gerekmediğini hatırlatır.
+
+Adaptör iki yol dener: makinede kendi `hik_camera` sarmalayıcın varsa onu kullanır (sahada
+denenmiş kod), yoksa SDK'ya doğrudan gider (cihaz tarama → aç → akış → `MV_CC_GetImageBuffer` →
+BGR'ye çevir).
+
+> **Doğrulama durumu.** Klasör, video, USB kamera ve RTSP adaptörleri bu makinede çalıştırılarak
+> sınandı. Hikrobot (MVS) ve ham TensorRT adaptörleri, çalışan sürücülerin port karşılığıdır;
+> sözleşmeye uydukları test edildi ama **ilgili donanım olmadan çalıştırılamadılar**. İlk kez
+> gerçek kamerada/kartta koşarken çıktılarını gözle doğrulayın — TensorRT'yi ultralytics
+> motoruyla karşılaştırmak en hızlı kontrol.
+
+---
+
 ## Depo yapısı
 
 ```
@@ -557,7 +739,7 @@ Boxify/
 ├── gorseller/                # ekran görüntüleri
 ├── testler/                  # 16 test + sahte ultralytics + calistir.sh
 └── boxify/
-    ├── __init__.py           # sürüm bilgisi (4.3.0)
+    ├── __init__.py           # sürüm bilgisi (5.0.0)
     ├── dil.py                # TR/EN dil eklentisi: sözlük + PyQt çeviri yamaları
     ├── tema.py               # açık/koyu tema: palet + stil renk çevirisi
     ├── proje.py              # dosya diyaloglarının son kullandığı klasör hafızası

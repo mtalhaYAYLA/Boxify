@@ -68,3 +68,31 @@ class YOLO:
                                        np.array(cfs, dtype=float),
                                        np.array(xyxy, dtype=float).reshape(-1, 4)),
                          self.names)]
+
+
+class _AcikSozluk(YOLO):
+    """Metinle tespit eden modellerin sahtesi (YOLO-World / YOLOE).
+
+    Gercek karsiliklari agirligi adindan indirebildigi icin, dosyanin diskte
+    olmasi sart degil — sahte de ayni davraniyor.
+    """
+
+    def __init__(self, path):
+        self.path = path
+        self.names = {}
+        self.verilen_siniflar = None
+        self._sayac = 0
+
+    def set_classes(self, classes, embeddings=None):
+        self.verilen_siniflar = list(classes)
+        self.names = {i: ad for i, ad in enumerate(classes)}
+        self.verilen_gomme = embeddings
+
+
+class YOLOWorld(_AcikSozluk):
+    pass
+
+
+class YOLOE(_AcikSozluk):
+    def get_text_pe(self, classes):
+        return [[0.0] * 4 for _ in classes]

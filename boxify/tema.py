@@ -2,12 +2,19 @@
 
 Tasarım dili (göz yormayan, düşük parlamalı):
 - Saf beyaz ve saf siyah kullanılmaz; ikisi de parlama/kontrast yorgunluğu yapar.
-- Vurgu: yumuşatılmış profesyonel mavi; hover biraz açılır, basılıda koyulaşır.
-  Neon/doygun tonlardan kaçınılır.
-- Köşeler yumuşak (6-10px), tüm tıklanabilir öğelerde hover/pressed efekti,
-  girdilerde odak (focus) mavi çerçevesi.
+- Vurgu temaya göre değişir: açık temada yumuşatılmış profesyonel mavi, koyu
+  temada mor. İkisinde de hover açılır, basılıda koyulaşır; neon/doygun
+  tonlardan kaçınılır.
+- Köşe ölçeği üç kademeli: küçük öğe 6-7px (liste satırı, menü öğesi),
+  kontrol 10px (buton, girdi), kap 12-14px (liste, kart, grup). Kaydırıcı
+  oluğu (2px) ve rozet hapı (16px) geometridir, ölçeğin dışındadır.
+- Tüm tıklanabilir öğelerde hover/pressed efekti, girdilerde odak çerçevesi.
 - Renk körlüğü kuralı korunur: kırmızı-yeşil ayrımına dayanılmaz; durumlar
-  mavi tonları + metin + desenle verilir.
+  vurgu tonları + metin + desenle verilir.
+
+Koyu temanın moru, Roboflow benzeri araçların görsel diline yaklaşmak için
+seçildi; açık tema bilinçli olarak mavi ve düşük parlamalı kaldı, gündüz uzun
+süre çalışan kullanıcı için.
 
 ## Koyu tema nasıl çalışıyor
 
@@ -109,7 +116,7 @@ QToolTip {{
     background-color: {METIN_ORTA};
     color: #f2f4f7;
     border: none;
-    border-radius: 5px;
+    border-radius: 7px;
     padding: 5px 9px;
     font-size: 12px;
 }}
@@ -119,7 +126,7 @@ QPushButton {{
     background-color: {GIRDI};
     color: {METIN_ORTA};
     border: 1px solid {KENARLIK_K};
-    border-radius: 6px;
+    border-radius: 10px;
     padding: 6px 14px;
 }}
 QPushButton:hover {{
@@ -153,7 +160,7 @@ QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {{
     background-color: {GIRDI};
     color: {METIN};
     border: 1px solid {KENARLIK_K};
-    border-radius: 6px;
+    border-radius: 10px;
     padding: 5px 9px;
     selection-background-color: {MAVI};
     selection-color: #f5f8fb;
@@ -168,7 +175,7 @@ QComboBox::drop-down {{ border: none; width: 24px; }}
 QComboBox QAbstractItemView {{
     background-color: {GIRDI};
     border: 1px solid {KENARLIK};
-    border-radius: 6px;
+    border-radius: 10px;
     selection-background-color: {MAVI};
     selection-color: #f5f8fb;
 }}
@@ -177,11 +184,11 @@ QComboBox QAbstractItemView {{
 QListWidget, QTreeWidget, QTableWidget, QTableView {{
     background-color: {GIRDI};
     border: 1px solid {KENARLIK};
-    border-radius: 8px;
+    border-radius: 12px;
     outline: none;
     alternate-background-color: {PANEL};
 }}
-QListWidget::item {{ padding: 3px 4px; border-radius: 4px; }}
+QListWidget::item {{ padding: 3px 4px; border-radius: 6px; }}
 QListWidget::item:hover, QTreeWidget::item:hover {{ background-color: {MAVI_ZEMIN}; }}
 QListWidget::item:selected, QTreeWidget::item:selected,
 QTableWidget::item:selected {{ background-color: {MAVI}; color: #f5f8fb; }}
@@ -199,7 +206,7 @@ QTextEdit, QPlainTextEdit {{
     background-color: {GIRDI};
     color: {METIN_ORTA};
     border: 1px solid {KENARLIK};
-    border-radius: 8px;
+    border-radius: 12px;
     selection-background-color: {MAVI};
     selection-color: #f5f8fb;
 }}
@@ -208,7 +215,7 @@ QTextEdit, QPlainTextEdit {{
 QGroupBox {{
     background-color: {PANEL};
     border: 1px solid {KENARLIK};
-    border-radius: 10px;
+    border-radius: 14px;
     margin-top: 14px;
     padding-top: 4px;
     font-weight: bold;
@@ -222,15 +229,15 @@ QGroupBox::title {{
 QTabWidget::pane {{
     background-color: {GIRDI};
     border: 1px solid {KENARLIK};
-    border-radius: 8px;
+    border-radius: 12px;
     top: -1px;
 }}
 QTabBar::tab {{
     background: transparent;
     color: {METIN_SOLUK};
     border: none;
-    border-top-left-radius: 6px;
-    border-top-right-radius: 6px;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
     padding: 8px 18px;
     margin-right: 2px;
 }}
@@ -247,17 +254,17 @@ QTabBar::tab:selected {{
 /* ── İlerleme / kaydırma / ayraç / slider ──────────────────────────────── */
 QProgressBar {{
     border: 1px solid {KENARLIK};
-    border-radius: 6px;
+    border-radius: 10px;
     background-color: {PANEL_KOYU};
     text-align: center;
     color: {METIN_ORTA};
     height: 18px;
 }}
-QProgressBar::chunk {{ background-color: {MAVI}; border-radius: 5px; }}
+QProgressBar::chunk {{ background-color: {MAVI}; border-radius: 7px; }}
 QScrollBar:vertical {{ background: transparent; width: 11px; border: none; }}
 QScrollBar:horizontal {{ background: transparent; height: 11px; border: none; }}
 QScrollBar::handle:vertical, QScrollBar::handle:horizontal {{
-    background: {KENARLIK_K}; border-radius: 5px; min-height: 24px; min-width: 24px;
+    background: {KENARLIK_K}; border-radius: 7px; min-height: 24px; min-width: 24px;
 }}
 QScrollBar::handle:hover {{ background: {MAVI_PARLAK}; }}
 QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; width: 0; }}
@@ -266,7 +273,7 @@ QSplitter::handle {{ background: {KENARLIK}; }}
 QSlider::groove:horizontal {{ height: 5px; background: {KENARLIK}; border-radius: 2px; }}
 QSlider::sub-page:horizontal {{ background: {MAVI_PARLAK}; border-radius: 2px; }}
 QSlider::handle:horizontal {{
-    width: 16px; margin: -6px 0; border-radius: 8px;
+    width: 16px; margin: -6px 0; border-radius: 12px;
     background: {MAVI};
     border: 2px solid {GIRDI};
 }}
@@ -274,16 +281,16 @@ QSlider::handle:horizontal:hover {{ background: {MAVI_PARLAK}; }}
 
 /* ── Menü / durum çubuğu / diyalog ─────────────────────────────────────── */
 QMenuBar {{ background-color: {PANEL}; color: {METIN_ORTA}; border-bottom: 1px solid {KENARLIK}; }}
-QMenuBar::item {{ padding: 5px 11px; border-radius: 5px; background: transparent; }}
+QMenuBar::item {{ padding: 5px 11px; border-radius: 7px; background: transparent; }}
 QMenuBar::item:selected {{ background-color: {MAVI_ZEMIN}; color: {MAVI}; }}
 QMenu {{
     background-color: {GIRDI};
     color: {METIN_ORTA};
     border: 1px solid {KENARLIK};
-    border-radius: 8px;
+    border-radius: 12px;
     padding: 5px;
 }}
-QMenu::item {{ padding: 6px 24px; border-radius: 5px; }}
+QMenu::item {{ padding: 6px 24px; border-radius: 7px; }}
 QMenu::item:selected {{ background-color: {MAVI}; color: #f5f8fb; }}
 QMenu::separator {{ height: 1px; background: {KENARLIK}; margin: 4px 2px; }}
 QStatusBar {{
@@ -320,7 +327,7 @@ QDialog {{ background-color: {ARKA}; }}
 #NavDugme {{
     background: transparent;
     border: none;
-    border-radius: 8px;
+    border-radius: 12px;
     color: #4d5765;
     text-align: left;
     padding: 9px 14px;
@@ -338,7 +345,7 @@ QDialog {{ background-color: {ARKA}; }}
 #DilDugme {{
     background-color: transparent;
     border: 1px solid {KENARLIK_K};
-    border-radius: 6px;
+    border-radius: 10px;
     color: #4d5765;
     font-size: 11px;
     font-weight: bold;
@@ -355,7 +362,7 @@ QDialog {{ background-color: {ARKA}; }}
 #Kart {{
     background-color: {GIRDI};
     border: 1px solid {KENARLIK};
-    border-radius: 10px;
+    border-radius: 14px;
 }}
 #Kart:hover {{ border: 1px solid {MAVI_PARLAK}; background-color: #edf1f6; }}
 #Kart QLabel {{ background: transparent; }}
@@ -375,7 +382,7 @@ QDialog {{ background-color: {ARKA}; }}
 #IpucuKart {{
     background-color: {GIRDI};
     border: 1px solid {KENARLIK};
-    border-radius: 10px;
+    border-radius: 14px;
 }}
 #IpucuKart:hover {{ border-color: {KENARLIK_K}; }}
 #IpucuKart QLabel {{ background: transparent; }}
@@ -384,7 +391,7 @@ QDialog {{ background-color: {ARKA}; }}
 #IpucuGenel {{
     background-color: #d6e2ee;
     border: 1px solid #b7c9da;
-    border-radius: 10px;
+    border-radius: 14px;
 }}
 #IpucuGenel QLabel {{ background: transparent; }}
 """
@@ -401,41 +408,44 @@ QDialog {{ background-color: {ARKA}; }}
 # temaya göre değiştirmek o dengeyi bozardı. Zaten yalnızca QPainter/QColor
 # ile kullanılıyorlar, aşağıdaki dönüşüm ise sadece stil metinlerine bakıyor.
 KOYU_HARITA = {
-    ARKA:        "#1b1f26",   # sayfa zemini
-    PANEL:       "#232830",   # bar / grup zeminleri
-    PANEL_KOYU:  "#2b313a",   # önizleme / ilerleme zemini
-    KENAR_ZEMIN: "#161a20",   # sol kenar çubuğu
-    GIRDI:       "#2b313a",   # kart / buton / girdi / liste zemini
-    KENARLIK:    "#3a4149",
-    KENARLIK_K:  "#49515b",
-    METIN:       "#e3e8ef",
-    METIN_ORTA:  "#c6cdd6",
-    METIN_SOLUK: "#98a3b0",
-    MAVI:        "#4a90d9",   # koyu zeminde okunması için biraz açıldı
-    MAVI_PARLAK: "#5ba0e6",
-    MAVI_BASILI: "#3d82c4",
-    MAVI_ZEMIN:  "#23374a",
+    ARKA:        "#0f172a",   # sayfa zemini
+    PANEL:       "#1e293b",   # bar / grup zeminleri
+    PANEL_KOYU:  "#111827",   # önizleme / ilerleme zemini
+    KENAR_ZEMIN: "#0b1220",   # sol kenar çubuğu
+    GIRDI:       "#1e293b",   # kart / buton / girdi / liste zemini
+    KENARLIK:    "#334155",
+    KENARLIK_K:  "#475569",
+    METIN:       "#e5e7eb",
+    METIN_ORTA:  "#cbd5e1",
+    METIN_SOLUK: "#94a3b8",
+    MAVI:        "#7c3aed",   # koyu temada vurgu mor
+    MAVI_PARLAK: "#a78bfa",
+    # Yalnızca "pressed" zemini değil, koyu zemine düşen bir METİN rengi de
+    # (kenar çubuğunda seçili öğe, kart özeti). Bu yüzden vurgudan koyu değil,
+    # açık seçildi — koyu bir mor o metinleri okunmaz yapıyordu.
+    MAVI_BASILI: "#8b5cf6",
+    MAVI_ZEMIN:  "#2e1065",
     # araç modüllerinde doğrudan yazılmış tonlar
     "#f5f8fb":   "#f0f6fc",   # vurgu düğmesi üstündeki metin — açık kalmalı
-    "#f2f4f7":   "#e3e8ef",
-    "#42505f":   "#b9c2cd",
-    "#4d5765":   "#aeb8c4",
-    "#76818f":   "#8e99a7",
-    "#8b95a3":   "#7f8a98",
-    "#9aa5b1":   "#79848f",
-    "#9aa7b6":   "#7c8794",
-    "#c4ccd6":   "#49515b",
-    "#b6c0cc":   "#525b66",
-    "#d4dae2":   "#3a4149",
-    "#d8dde4":   "#333a43",
-    "#e3e8ee":   "#2b313a",
-    "#e4e8ee":   "#2b313a",
-    "#edf1f6":   "#2a313b",   # kart hover
-    "#f2f5f8":   "#262c35",   # eğitimdeki sabit şerit
-    "#b3c8dc":   "#2f5375",   # kaydırma çubuğu tutamacı
-    "#b7c9da":   "#3d82c4",
-    "#d6e2ee":   "#23374a",
-    "#ffffff":   "#232830",   # beyaz zeminler (grafik tuvali vb.)
+    "#f2f4f7":   "#e5e7eb",
+    "#42505f":   "#c8d0dc",
+    "#4d5765":   "#bcc5d3",
+    "#76818f":   "#94a3b8",
+    "#8b95a3":   "#8896a8",
+    "#9aa5b1":   "#7d8b9d",
+    "#9aa7b6":   "#808e9f",
+    "#c4ccd6":   "#2a2447",   # kenar çubuğu hover zemini
+    "#b6c0cc":   "#4b5566",
+    "#d4dae2":   "#334155",
+    "#d8dde4":   "#2a3444",
+    "#e3e8ee":   "#1e293b",
+    "#e4e8ee":   "#1e293b",
+    "#edf1f6":   "#243049",   # kart hover
+    "#f2f5f8":   "#16203a",   # eğitimdeki sabit şerit
+    "#b3c8dc":   "#312a52",   # kaydırma tutamacı + seçili menü öğesi zemini
+    "#b7c9da":   "#8b5cf6",
+    "#d6e2ee":   "#2b2150",
+    "#ffffff":   "#1e293b",   # beyaz zeminler (grafik tuvali vb.)
 }
 
 _KOYU_ARAMA = {k.lower(): v for k, v in KOYU_HARITA.items()}

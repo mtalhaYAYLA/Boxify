@@ -107,8 +107,17 @@ class Dataset:
         if self.label_classes or not self.folder:
             return bool(self.label_classes)
 
-        # Klasör + üst klasörde ara
-        search_dirs = [self.folder, os.path.dirname(self.folder)]
+        # Klasör + üstündeki üç seviye. İndirilen veri setlerinde görseller
+        # <kök>/images/<bölüm>/ altındadır, sınıf dosyası ise kökte durur —
+        # yalnızca bir üste bakmak onu ıskalıyordu.
+        search_dirs = [self.folder]
+        d = self.folder
+        for _ in range(3):
+            ust = os.path.dirname(os.path.normpath(d))
+            if not ust or ust == d:
+                break
+            search_dirs.append(ust)
+            d = ust
 
         for d in search_dirs:
             # data.yaml / data.yml
@@ -148,7 +157,11 @@ class Dataset:
                 except Exception:
                     pass
 
-        return False
+        # Sınıf dosyası hiç yok: etiketlerdeki en büyük id'den türet. Bu yöntem
+        # zaten vardı ama hiçbir yerden çağrılmıyordu; coco128 gibi yalnızca
+        # görsel + etiket getiren setlerde sınıf paneli boş kalıyor, 1-9
+        # kısayolları çalışmıyor ve kutular renksiz görünüyordu.
+        return self.auto_detect_classes_from_labels()
 
     def auto_detect_classes_from_labels(self) -> bool:
         """

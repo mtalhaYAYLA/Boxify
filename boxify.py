@@ -24,7 +24,7 @@ gstreamer_yardim.hazirla()
 from PyQt5.QtWidgets import QApplication          # noqa: E402
 from PyQt5.QtGui import QIcon                     # noqa: E402
 
-from boxify import SURUM                          # noqa: E402
+from boxify import SURUM, YAZAR                   # noqa: E402
 from boxify import dil                            # noqa: E402
 from boxify import tema                           # noqa: E402
 from boxify import proje                          # noqa: E402
@@ -47,6 +47,7 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Boxify")
     app.setApplicationVersion(SURUM)
+    app.setOrganizationName(YAZAR)
     app.setStyleSheet(tema.stil())
 
     ikon = os.path.join(KOK, "ikon.png")

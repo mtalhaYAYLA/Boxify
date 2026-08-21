@@ -6,13 +6,12 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt
 from ..core.trainer import TrainerThread
+from ...model_secici import ModelSecici
 
-YOLO_MODELS = [
-    "yolo11n", "yolo11s", "yolo11m", "yolo11l", "yolo11x",
-    "yolov8n", "yolov8s", "yolov8m", "yolov8l", "yolov8x",
-    "yolov9c", "yolov9e",
-    "yolov10n", "yolov10s", "yolov10m", "yolov10l", "yolov10x",
-]
+# Model listesi burada tutulmuyor: aynı soru Eğitim aracında da soruluyordu
+# ve iki ayrı elle yazılmış liste vardı — biri güncellenince diğeri eskiyor,
+# kullanıcı aynı uygulamada iki farklı model listesi görüyordu.
+# Ortak seçici: boxify/araclar/model_secici.py
 
 
 class TrainingDialog(QDialog):
@@ -47,9 +46,10 @@ class TrainingDialog(QDialog):
         cfg = QGroupBox("Eğitim Ayarları")
         form = QFormLayout(cfg)
 
-        self.model_cb = QComboBox()
-        self.model_cb.addItems(YOLO_MODELS)
-        self.model_cb.setCurrentText("yolo11m")
+        self.model_cb = ModelSecici(varsayilan="yolo11m.pt")
+        self.model_cb.setToolTip(
+            "Önce aile, sonra sürüm. Sağdaki alana listede olmayan bir ad ya da\n"
+            "dosya yolu da yazılabilir.")
         form.addRow("YOLO Modeli:", self.model_cb)
 
         self.epochs_sp = QSpinBox()
@@ -170,7 +170,7 @@ class TrainingDialog(QDialog):
             self._append("⚠  Lütfen önce çıktı klasörü seçin.")
             return
 
-        model  = self.model_cb.currentText()
+        model  = self.model_cb.model_adi()
         epochs = self.epochs_sp.value()
         batch  = self.batch_sp.value()
         imgsz  = int(self.imgsz_cb.currentText())

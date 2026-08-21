@@ -23,7 +23,9 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QRectF, QLineF
 from PyQt5.QtGui import QImage, QPainter, QPen, QColor, QFont
 
-from ..tema import STYLE  # ortak açık tema — bkz. boxify/tema.py
+from ..tema import STYLE, renk  # ortak açık tema — bkz. boxify/tema.py
+from .mlflow_kayit import onay_kutusu, kaydet as mlflow_kaydet
+from . import roi as roi_modulu
 from .model_bilgi import SinifYukleyici, sinif_ozeti, cihaz_combo_doldur
 
 IMG_EXTS = (".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff")
@@ -174,6 +176,9 @@ class EvalWorker(QThread):
         # karışıklık matrisi: satır = gerçek (son satır: arka plan), kolon = tahmin
         cm = [[0] * (nc + 1) for _ in range(nc + 1)]
         items = []
+        roi_poligonlari = cfg.get("roi") or []
+        if roi_poligonlari:
+            self.log.emit("ROI süzgeci açık — " + roi_modulu.ozet(roi_poligonlari))
         toplam = {"tp": 0, "fp": 0, "fn": 0, "conf": 0, "gt": 0, "pred": 0}
 
         for i, img_path in enumerate(images):
@@ -194,6 +199,12 @@ class EvalWorker(QThread):
 
             H, W = res.orig_shape
             gt_px = [(c, *xywhn_to_xyxy((c, x, y, w, h), W, H)) for c, x, y, w, h in gt_n]
+            # ROI dışındaki referans kutuları da elenmeli: yalnızca tahminleri
+            # elemek, dışarıdaki her gerçek nesneyi "kaçırıldı" sayardı ve
+            # modeli ilgilenmediğimiz bölge yüzünden cezalandırırdı.
+            if roi_poligonlari:
+                gt_px = [g for g in gt_px
+                         if roi_modulu.kutu_gecerli(roi_poligonlari, g[1:], W, H)]
             pred_px = []
             if res.boxes is not None and len(res.boxes):
                 xyxy = res.boxes.xyxy.cpu().numpy()
@@ -201,6 +212,9 @@ class EvalWorker(QThread):
                 cfs = res.boxes.conf.cpu().numpy()
                 order = cfs.argsort()[::-1]
                 for k in order:
+                    if roi_poligonlari and not roi_modulu.kutu_gecerli(
+                            roi_poligonlari, xyxy[k].tolist(), W, H):
+                        continue
                     pred_px.append((int(clss[k]), float(cfs[k]), *xyxy[k].tolist()))
 
             results, fns = match_boxes(gt_px, pred_px, cfg["iou_match"])
@@ -368,9 +382,11 @@ class PreviewCanvas(QWidget):
 
     def paintEvent(self, ev):
         p = QPainter(self)
-        p.fillRect(self.rect(), QColor("#dde1e7"))
+        # Kendi boyamasını yapan widget tema yamasının dışında kalıyor;
+        # renk() olmadan koyu temada açık gri bir kutu olarak sırıtıyordu.
+        p.fillRect(self.rect(), QColor(renk("#dde1e7")))
         if self._img is None:
-            p.setPen(QColor("#6b7686"))
+            p.setPen(QColor(renk("#6b7686")))
             p.drawText(self.rect(), Qt.AlignCenter, self._info)
             return
 
@@ -663,6 +679,16 @@ class MainWindow(QMainWindow):
                                  "gereken örtüşme")
         v.addLayout(self._row("Eşleştirme IoU", self.eval_iou))
 
+        self.roi_chk = QCheckBox("Yalnızca ilgi alanı (ROI) içi")
+        self.roi_chk.setToolTip(
+            "Görsel klasörünün yanındaki roi.json kullanılır.\n"
+            "Hem tahminler hem referans kutular elenir: yalnızca tahminleri\n"
+            "elemek, ROI dışındaki her nesneyi 'kaçırıldı' sayardı.")
+        v.addWidget(self.roi_chk)
+
+        self.mlflow_chk = onay_kutusu()
+        v.addWidget(self.mlflow_chk)
+
         self.eval_btn = QPushButton("🔍  Değerlendir")
         self.eval_btn.setMinimumHeight(36)
         self.eval_btn.setStyleSheet(
@@ -838,6 +864,9 @@ class MainWindow(QMainWindow):
             "iou_nms": float(self.iou_nms_spin.value()),
             "max_det": int(self.maxdet_spin.value()),
             "device": self.device_combo.currentData(),
+            "roi": (roi_modulu.yukle(self._img_dir)
+                    if (self.roi_chk.isChecked() and getattr(self, "_img_dir", ""))
+                    else []),
         }
 
     def _start_eval(self):
@@ -919,6 +948,39 @@ class MainWindow(QMainWindow):
         self.active_btn.setEnabled(True)
         self.cancel_btn.setEnabled(False)
 
+    def _mlflowa_yaz(self, res: dict):
+        """Değerlendirme dökümünü kaydet.
+
+        Kaydedilen şey tek bir skor değil, hata dökümünün kendisi: kaçırma
+        (fn), uydurma (fp) ve sınıf karışıklığı (conf). Turlar arası asıl
+        kıyas bunlar üzerinden yapılıyor — "mAP arttı" tek başına hangi
+        hatanın azaldığını söylemiyor.
+        """
+        if not (self.mlflow_chk.isChecked() and self.mlflow_chk.isEnabled()):
+            return
+        if res.get("mode") != "eval":
+            return
+        import time as _t
+        toplam = res.get("toplam") or {}
+        metrikler = {k: v for k, v in toplam.items() if isinstance(v, (int, float))}
+        tp, fp, fn = toplam.get("tp", 0), toplam.get("fp", 0), toplam.get("fn", 0)
+        if tp + fp:
+            metrikler["kesinlik"] = tp / (tp + fp)
+        if tp + fn:
+            metrikler["duyarlilik"] = tp / (tp + fn)
+        metrikler["gorsel"] = len(res.get("items") or [])
+        notu = mlflow_kaydet(
+            os.path.dirname(self._model_path) or os.getcwd(),
+            "boxify-hata-analizi",
+            _t.strftime("%Y%m%d_%H%M%S"),
+            parametreler={"model": os.path.basename(self._model_path),
+                          "conf": self.eval_conf.value(),
+                          "iou": self.eval_iou.value()},
+            metrikler=metrikler,
+            etiketler={"arac": "hata_analizi"})
+        if notu:
+            self._log(notu)
+
     def _on_result(self, res: dict):
         self._mode = res["mode"]
         self._items = res["items"]
@@ -931,6 +993,7 @@ class MainWindow(QMainWindow):
             self.report_box.setPlainText(self._active_report(res))
         self.tabs_out.setCurrentIndex(0)
         self.status.showMessage("Bitti." + (" (iptal edildi)" if res["iptal"] else ""))
+        self._mlflowa_yaz(res)
 
     # ── liste / önizleme
     def _refill(self):
