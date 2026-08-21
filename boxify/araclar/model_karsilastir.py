@@ -39,6 +39,7 @@ from PyQt5.QtGui import QImage, QPixmap
 
 from ..tema import STYLE, MAVI  # ortak açık tema — bkz. boxify/tema.py
 from .mlflow_kayit import onay_kutusu, kaydet as mlflow_kaydet
+from . import roi as roi_modulu
 from .model_bilgi import SinifYukleyici, sinif_ozeti, cihaz_combo_doldur
 
 MAX_MODELS = 3
@@ -241,6 +242,10 @@ class CompareWorker(QThread):
         yazicilar_kuruldu = False
 
         panel_h = cfg["panel_h"]
+        roi_poligonlari = cfg.get("roi") or []
+        if roi_poligonlari:
+            self.log.emit("ROI süzgeci açık — "
+                          + roi_modulu.ozet(roi_poligonlari))
         stats = {m["label"]: {"kare": 0, "tespit": 0, "sinif": {},
                               "conf_toplam": 0.0, "conf_sayi": 0,
                               "kare_tespitli": 0, "hata": 0,
@@ -309,11 +314,24 @@ class CompareWorker(QThread):
                 st = stats[m["label"]]
                 st["kare"] += 1
                 st["sure_toplam"] += dt
+                if n and roi_poligonlari:
+                    # Sayım ROI içiyle sınırlanıyor; komşu hattaki tespitler
+                    # modelleri kıyaslarken gürültü olur.
+                    xyxy_r = boxes.xyxy.cpu().numpy()
+                    Hk, Wk = res.orig_shape
+                    kalan = [k for k in range(n)
+                             if roi_modulu.kutu_gecerli(roi_poligonlari,
+                                                        xyxy_r[k].tolist(), Wk, Hk)]
+                    st["roi_elenen"] = st.get("roi_elenen", 0) + (n - len(kalan))
+                    n = len(kalan)
                 if n:
                     st["tespit"] += n
                     st["kare_tespitli"] += 1
                     clss = boxes.cls.cpu().numpy().astype(int)
                     confs = boxes.conf.cpu().numpy()
+                    if roi_poligonlari:
+                        clss = clss[kalan]
+                        confs = confs[kalan]
                     for c, cf in zip(clss, confs):
                         cname = m["names"].get(int(c), str(c))
                         st["sinif"][cname] = st["sinif"].get(cname, 0) + 1
@@ -569,6 +587,12 @@ class MainWindow(QMainWindow):
         self.out_edit = QLineEdit()
         self.out_edit.setPlaceholderText("karşılaştırma videosunun kaydedileceği klasör")
         sv.addLayout(self._dir_row(self.out_edit, self._pick_out_dir))
+        self.roi_chk = QCheckBox("Yalnızca ilgi alanı (ROI) içi")
+        self.roi_chk.setToolTip(
+            "Video dosyasının yanındaki roi.json kullanılır.\n"
+            "Komşu hattaki tespitler modelleri kıyaslarken gürültü olur.")
+        sv.addWidget(self.roi_chk)
+
         self.mlflow_chk = onay_kutusu()
         sv.addWidget(self.mlflow_chk)
 
@@ -1303,6 +1327,8 @@ class MainWindow(QMainWindow):
             "write_video": self.write_video_chk.isChecked(),
             "out_dir": self._out_dir,
             "save_individual": self.indiv_chk.isChecked() and self.write_video_chk.isChecked(),
+            "roi": (roi_modulu.yukle(os.path.dirname(self._video_path))
+                    if (self.roi_chk.isChecked() and self._video_path) else []),
             **ortak,
         }
 

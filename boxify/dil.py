@@ -1045,6 +1045,21 @@ SOZLUK = {
     "Dayanıklılık koşusu": "Endurance run",
     # ── Canlı kaynak (kamera / RTSP / SDK) ──
     "Canlı Kaynaktan Yakala": "Capture from a Live Source",
+    "Canlı kaynaktan etiketlemek için Kare Alıcı'da kareleri yakalayıp "
+    "buraya o klasörü ver — böylece etiketlediğin kareler diskte kalır.":
+        "To label from a live source, capture the frames in Frame Grabber and "
+        "point this at that folder — that way the frames you label stay on disk.",
+    "Yalnızca ilgi alanı (ROI) içi": "Region of interest (ROI) only",
+    "Görsel klasörünün yanındaki roi.json kullanılır.\n"
+    "Hem tahminler hem referans kutular elenir: yalnızca tahminleri\n"
+    "elemek, ROI dışındaki her nesneyi 'kaçırıldı' sayardı.":
+        "The roi.json next to the image folder is used.\n"
+        "Both predictions and ground-truth boxes are filtered: filtering only\n"
+        "predictions would count every object outside the ROI as a miss.",
+    "Video dosyasının yanındaki roi.json kullanılır.\n"
+    "Komşu hattaki tespitler modelleri kıyaslarken gürültü olur.":
+        "The roi.json next to the video file is used.\n"
+        "Detections on the neighbouring line are noise when comparing models.",
     "● Canlı Yakala": "● Capture Live",
     "■ Durdur": "■ Stop",
     "Adet": "Count",

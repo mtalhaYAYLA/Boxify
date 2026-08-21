@@ -193,7 +193,35 @@ git checkout main        # güncele dön
 | [`v4.0.0`](../../releases/tag/v4.0.0) | **Döngü uygulamanın içinde kapandı:** ◈ Eğitim (dokuzuncu araç) + ⇉ veri seti birleştirme/sınıf eşleme + sızıntılı bölme hatasının düzeltilmesi + platforma göre kurulum (macOS `.app`) |
 | [`v4.1.0`](../../releases/tag/v4.1.0) | **☀/☾ Açık ve koyu tema** + platform desteğinin macOS/Linux/Windows'ta eşitlenmesi (GStreamer düzeltmesi ARM Linux'ta da çalışıyor) |
 | [`v4.2.0`](../../releases/tag/v4.2.0) | **Yol hafızası** (33 diyalog son kullanılan klasörü hatırlıyor) + kurulum betikleri artık ortamı da kuruyor (`kur.sh ortam`, conda öncelikli) |
-| [`v4.3.0`](../../releases/tag/v4.3.0) | **⇩ COCO / Pascal VOC içe aktarma** + **⇥ takip destekli etiketleme** (kutuyu sonraki karelere taşıma) — **güncel sürüm** |
+| [`v4.3.0`](../../releases/tag/v4.3.0) | **⇩ COCO / Pascal VOC içe aktarma** + **⇥ takip destekli etiketleme** (kutuyu sonraki karelere taşıma) |
+| [`v5.0.0`](../../releases/tag/v5.0.0) | **Çekirdek/adaptör mimarisi**, **canlı kamera girişi**, **ilgi alanı (ROI)**, **MLflow**, **dayanıklılık koşusu**, yeniden yazılmış **Labelapp editörü** — **güncel sürüm** |
+
+### 5.0.0'da neler değişti
+
+**Mimari.** Boxify dışarıya iki yerden bağlanıyor: kareyi nereden aldığı ve çıkarımı neyin
+yaptığı. İkisi de port oldu (`boxify/cekirdek/`), somut karşılıkları adaptör (`boxify/adaptorler/`).
+Çekirdek PyQt5, ultralytics, tensorrt ve cv2 import etmiyor — bu kural yorumda değil testte duruyor.
+
+**Canlı kamera girişi.** Kare Alıcı artık dosyadan başka kaynak da okuyor: `kamera:0` (USB),
+`rtsp://…` ve `hik:192.168.1.64` (Hikrobot MVS SDK). Kaynak türü adresten anlaşılıyor.
+
+**İlgi alanı (ROI).** Poligon çizilip Oto Label, Hata Analizi ve Model Karşılaştır'da
+uygulanıyor. Hata Analizi'nde referans kutular da eleniyor — yalnızca tahminleri elemek,
+ROI dışındaki her nesneyi "kaçırıldı" saymak olurdu.
+
+**MLflow.** Ölçüm üreten dört araçta da isteğe bağlı kayıt. Kutu kapalıyken ultralytics'in
+varsayılan açık gelen kaydı da kapatılıyor.
+
+**Dayanıklılık koşusu.** "Ne kadar hızlı" değil "uzun koşuda ayakta mı": bellek, takas ve
+sıcaklık örneklenip GEÇTİ/UYARI/KALDI değerlendirmesi çıkıyor. Hız ölçümüne p99, sivrilme
+ve sürüklenme eklendi.
+
+**Labelapp editörü.** Yakınlaştırma/kaydırma, kılavuz çizgileri, geri al/yinele, kutunun
+üstünde sınıf paneli, küçük resim ızgarası, araç rayı, 1-9 kısayolları, görseli silme.
+İndirilen YOLO veri setleri (`images/<bölüm>` ↔ `labels/<bölüm>`) artık açılabiliyor.
+
+**Model seçimi.** 165 ağırlık, iki kademeli (aile → sürüm) seçici; liste ultralytics'in kendi
+listesinden geliyor ve alan yazılabilir.
 
 ### 4.3.0'da neler değişti
 
@@ -711,7 +739,7 @@ Boxify/
 ├── gorseller/                # ekran görüntüleri
 ├── testler/                  # 16 test + sahte ultralytics + calistir.sh
 └── boxify/
-    ├── __init__.py           # sürüm bilgisi (4.3.0)
+    ├── __init__.py           # sürüm bilgisi (5.0.0)
     ├── dil.py                # TR/EN dil eklentisi: sözlük + PyQt çeviri yamaları
     ├── tema.py               # açık/koyu tema: palet + stil renk çevirisi
     ├── proje.py              # dosya diyaloglarının son kullandığı klasör hafızası

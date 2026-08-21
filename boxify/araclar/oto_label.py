@@ -531,6 +531,13 @@ class MainWindow(QMainWindow):
         self.img_edit = QLineEdit()
         self.img_edit.setPlaceholderText("fotoğrafların olduğu klasör")
         gi.addLayout(self._dir_row(self.img_edit, self._pick_img_dir))
+        self.canli_lbl = QLabel(
+            "Canlı kaynaktan etiketlemek için Kare Alıcı'da kareleri yakalayıp "
+            "buraya o klasörü ver — böylece etiketlediğin kareler diskte kalır.")
+        self.canli_lbl.setStyleSheet("color:#6b7686; font-size:11px;")
+        self.canli_lbl.setWordWrap(True)
+        gi.addWidget(self.canli_lbl)
+
         self.recursive_chk = QCheckBox("Alt klasörleri de tara")
         self.recursive_chk.toggled.connect(self._rescan_images)
         gi.addWidget(self.recursive_chk)
